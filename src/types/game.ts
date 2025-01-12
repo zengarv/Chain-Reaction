@@ -17,3 +17,10 @@ export interface Cell {
   orbs: number;
   playerId: string | null;
 }
+
+export interface Message {
+  id: string;
+  playerId: string;
+  text: string;
+  timestamp: Date;
+}

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import GameBoard from './GameBoard';
-import { Cell, GameSettings } from '../types/game';
+import PlayersList from './PlayersList';
+import ChatWindow from './ChatWindow';
+import { Cell, GameSettings, Message } from '../types/game';
 
 const DEFAULT_SETTINGS: GameSettings = {
   boardSize: { rows: 9, cols: 6 },
@@ -14,12 +17,21 @@ const GameRoom: React.FC = () => {
   const [board, setBoard] = useState<Cell[][]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<string>('player1');
   const [isExploding, setIsExploding] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  
   const playerColors: Record<string, string> = {
     'player1': '#FF5555',
     'player2': '#50FA7B',
     'player3': '#BD93F9',
     'player4': '#FFB86C',
   };
+
+  const players = [
+    { id: 'player1', isAdmin: true },
+    { id: 'player2', isAdmin: false },
+  ];
+
 
   useEffect(() => {
     const settings = location.state?.settings || DEFAULT_SETTINGS;
@@ -113,20 +125,68 @@ const GameRoom: React.FC = () => {
       </div>
     );
   }
+  const handleSendMessage = (text: string) => {
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      playerId: currentPlayer,
+      text,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, newMessage]);
+  };
+
+  if (board.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-900 p-4 flex flex-col items-center justify-center">
+        <div className="text-white text-xl">Loading game board...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-4 flex flex-col items-center">
-      <h2 className="text-2xl font-bold text-white mb-8">Room: {roomId}</h2>
-      <div className="w-full max-w-3xl">
-        <GameBoard
-          board={board}
-          currentPlayer={currentPlayer}
-          onCellClick={handleCellClick}
-          playerColors={playerColors}
-        />
-      </div>
-      <div className="mt-4 text-white">
-        Current Player: {currentPlayer}
+    <div className="min-h-screen bg-gray-900 p-8">
+      <div className="max-w-7xl mx-auto grid grid-cols-4 gap-6">
+        <div className="col-span-3">
+          <h2 className="text-2xl font-bold text-white mb-8">Room: {roomId}</h2>
+          <motion.div 
+            className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <GameBoard
+              board={board}
+              currentPlayer={currentPlayer}
+              onCellClick={handleCellClick}
+              playerColors={playerColors}
+            />
+          </motion.div>
+        </div>
+        
+        <div className="space-y-6">
+          <PlayersList
+            players={players}
+            currentPlayer={currentPlayer}
+            playerColors={playerColors}
+          />
+          
+          <ChatWindow
+            messages={messages}
+            playerColors={playerColors}
+            onSendMessage={handleSendMessage}
+          />
+          
+          {!gameStarted && players.find(p => p.id === currentPlayer)?.isAdmin && (
+            <motion.button
+              className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg font-medium 
+                       hover:bg-purple-700 transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setGameStarted(true)}
+            >
+              Start Game
+            </motion.button>
+          )}
+        </div>
       </div>
     </div>
   );
