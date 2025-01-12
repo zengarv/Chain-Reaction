@@ -20,7 +20,7 @@ const PlayersList: React.FC<PlayersListProps> = ({ players, currentPlayer, gameS
           whileHover={{ rotate: 15, scale: 1.1 }}
           transition={{ type: "spring", stiffness: 400 }}
         >
-          <Users className="w-5 h-5 text-white" />
+          <Users className="w-5 h-5 text-purple-400" />
         </motion.div>
         <h2 className="text-lg font-semibold text-white">Players</h2>
       </motion.div>
@@ -42,7 +42,12 @@ const PlayersList: React.FC<PlayersListProps> = ({ players, currentPlayer, gameS
             />
             <span className="text-gray-300">{player.name}</span>
             {player.isAdmin && (
-              <span className="text-xs text-purple-400 ml-auto">Admin</span>
+              <motion.div
+                whileHover={{ translateY: -5, scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 400 }}
+              >
+                <Crown className="w-4 h-4 text-yellow-400" />
+              </motion.div>
             )}
             {!player.isActive && gameStarted && (
               <span className="text-xs text-red-400 ml-auto">Eliminated</span>

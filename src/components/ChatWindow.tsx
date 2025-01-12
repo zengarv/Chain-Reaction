@@ -38,7 +38,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           whileHover={{ rotate: 15, scale: 1.1 }}
           transition={{ type: "spring", stiffness: 400 }}
         >
-          <MessageCircle className="w-5 h-5 text-white" />
+          <MessageCircle className="w-5 h-5 text-purple-400" />
         </motion.div>
         <h2 className="text-lg font-semibold text-white">Chat</h2>
       </motion.div>
@@ -73,10 +73,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         <motion.button
           type="submit"
           className="bg-gray-700 p-2 rounded hover:bg-gray-600 transition-colors"
-          whileHover={{ scale: 1.1, rotate: 5 }}
+          whileHover={{ scale: 1.2, rotate: 5 }}
           whileTap={{ scale: 0.9 }}
         >
+          <motion.div
+            whileTap={{ translateX: 2, translateY: -2, scale: 1.1 }}
+            transition={{ type: "spring", stiffness: 400 }}
+          >
           <Send className="w-4 h-4 text-white" />
+          </motion.div>
         </motion.button>
       </form>
     </motion.div>
