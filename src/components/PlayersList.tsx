@@ -12,7 +12,18 @@ interface PlayersListProps {
 const PlayersList: React.FC<PlayersListProps> = ({ players, currentPlayer, gameStarted }) => {
   return (
     <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4">
-      <h3 className="text-lg font-medium text-gray-300 mb-3">Players</h3>
+      <motion.div 
+        className="flex items-center space-x-2 mb-4"
+        whileHover={{ x: 5 }}
+      >
+        <motion.div
+          whileHover={{ rotate: 15, scale: 1.1 }}
+          transition={{ type: "spring", stiffness: 400 }}
+        >
+          <Users className="w-5 h-5 text-white" />
+        </motion.div>
+        <h2 className="text-lg font-semibold text-white">Players</h2>
+      </motion.div>
       <div className="space-y-2">
         {players.map((player) => (
           <motion.div

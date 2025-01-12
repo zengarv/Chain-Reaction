@@ -7,17 +7,19 @@ import ChatWindow from './ChatWindow';
 import { Cell, GameSettings, Message, Player } from '../types/game';
 import { GameLogic } from './GameLogic';
 import { RoomHeader } from './RoomHeader';
+import GameOver from './GameOver';
 
 const PLAYER_COLORS = {
-  player1: '#FF5555', // Red
-  player2: '#50FA7B', // Green
-  player3: '#BD93F9', // Purple
-  player4: '#FFB86C', // Orange
-  player5: '#8BE9FD', // Cyan
-  player6: '#F1FA8C', // Yellow
-  player7: '#FF79C6', // Pink
-  player8: '#50FA7B', // Lime
+  player1: '#FF4C3C', // Bright Red
+  player2: '#2EFF31', // Vivid Green
+  player3: '#3498FF', // Bright Blue
+  player4: '#F1C40F', // Golden Yellow
+  player5: '#9B59B6', // Deep Purple
+  player6: '#E67E22', // Bright Orange
+  player7: '#01F9C6', // Teal
+  player8: '#F0FEFB', // White
 };
+
 
 const DEFAULT_SETTINGS: GameSettings = {
   boardSize: { rows: 9, cols: 6 },
@@ -34,6 +36,7 @@ const GameRoom: React.FC = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
+  const [winner, setWinner] = useState<Player | null>(null);
 
   // Initialize players and game logic based on settings
   useEffect(() => {
@@ -70,12 +73,12 @@ const GameRoom: React.FC = () => {
 
   const handleCellClick = async (row: number, col: number) => {
     if (!gameLogic || !currentPlayer || isExploding || !gameStarted) return;
-
+  
     if (!gameLogic.isValidMove(row, col, currentPlayer.id)) return;
-
+  
     const willExplode = gameLogic.addOrb(row, col);
     updateBoard(gameLogic.getBoard());
-
+  
     if (willExplode) {
       setIsExploding(true);
       await gameLogic.handleExplosions(updateBoard, 200);
@@ -84,6 +87,7 @@ const GameRoom: React.FC = () => {
       
       if (activePlayers.length <= 1) {
         setGameStarted(false);
+        setWinner(activePlayers[0] || currentPlayer);
       } else {
         gameLogic.getNextPlayer();
         const nextPlayer = gameLogic.getCurrentPlayer();
@@ -98,13 +102,42 @@ const GameRoom: React.FC = () => {
       setCurrentPlayer(nextPlayer);
       setPlayers(gameLogic.getActivePlayers());
     }
-  };
+  };  
 
   const handleStartGame = () => {
     if (players.length >= 2) {
       setGameStarted(true);
     }
   };
+
+  const handlePlayAgain = () => {
+    const settings = location.state?.settings || DEFAULT_SETTINGS;
+    const { maxPlayers } = settings;
+    
+    const initialPlayers = Array.from({ length: maxPlayers }, (_, index) => ({
+      id: `player${index + 1}`,
+      name: index === 0 && location.state?.playerName ? 
+        location.state.playerName : 
+        `Player ${index + 1}`,
+      color: PLAYER_COLORS[`player${index + 1}` as keyof typeof PLAYER_COLORS],
+      isAdmin: index === 0,
+      isActive: true
+    }));
+  
+    const newGameLogic = new GameLogic(
+      settings.boardSize.rows,
+      settings.boardSize.cols,
+      initialPlayers
+    );
+  
+    setGameLogic(newGameLogic);
+    setBoard(newGameLogic.getBoard());
+    setPlayers(initialPlayers);
+    setCurrentPlayer(newGameLogic.getCurrentPlayer());
+    setWinner(null);
+    setGameStarted(false);
+    setMessages([]);
+  };  
 
   const handleSendMessage = (text: string) => {
     if (!gameLogic || !currentPlayer) return;
@@ -128,7 +161,7 @@ const GameRoom: React.FC = () => {
 
   return (
     <motion.div 
-      className="min-h-screen bg-gray-900 p-3 lg:p-4"
+      className="min-h-screen bg-gray-900 p-3 lg:p-4 relative"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
@@ -177,8 +210,18 @@ const GameRoom: React.FC = () => {
           )}
         </motion.div>
       </motion.div>
+      
+      {winner && (
+        <GameOver
+          winner={{
+            name: winner.name,
+            color: winner.color
+          }}
+          onPlayAgain={handlePlayAgain}
+        />
+      )}
     </motion.div>
   );
-};
+}
 
 export default GameRoom;

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Home, Copy, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Player } from '../types/game';
+import { useNavigate } from 'react-router-dom';
 
 interface RoomHeaderProps {
   roomId: string;
@@ -10,6 +11,7 @@ interface RoomHeaderProps {
 }
 
 export const RoomHeader: React.FC<RoomHeaderProps> = ({ roomId, playerCount }) => {
+  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
 
   const copyRoomId = () => {
@@ -30,7 +32,9 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({ roomId, playerCount }) =
             whileHover={{ rotate: 15, scale: 1.1 }}
             transition={{ type: "spring", stiffness: 400 }}
           >
-            <Home className="w-6 h-6 text-purple-400" />
+            <Home className="w-6 h-6 text-purple-400" 
+                onClick={() => navigate('/')}
+            />
           </motion.div>
           <div>
             <h2 className="text-lg text-gray-400 font-medium">Room ID</h2>
