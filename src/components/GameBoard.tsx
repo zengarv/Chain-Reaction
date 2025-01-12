@@ -25,7 +25,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
   return (
     <div 
-      className="grid gap-0.5"
+      className="grid gap-1"
       style={{
         gridTemplateColumns: `repeat(${board[0].length}, minmax(0, 1fr))`,
       }}

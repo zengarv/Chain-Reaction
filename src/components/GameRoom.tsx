@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import GameBoard from './GameBoard';
 import PlayersList from './PlayersList';
 import ChatWindow from './ChatWindow';
@@ -144,54 +144,118 @@ const GameRoom: React.FC = () => {
     );
   }
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        duration: 0.5,
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 p-3 lg:p-4">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
-        <div className="lg:col-span-3">
-          <h2 className="text-2xl font-bold text-white mb-3">Room: {roomId}</h2>
+    <motion.div 
+      className="min-h-screen bg-gray-900 p-3 lg:p-4"
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      <motion.div 
+        className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4"
+        variants={containerVariants}
+      >
+        <motion.div 
+          className="lg:col-span-3"
+          variants={itemVariants}
+        >
+          <motion.h2 
+            className="text-2xl font-bold text-white mb-3"
+            whileHover={{ x: 5 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            Room: {roomId}
+          </motion.h2>
+          
           <motion.div 
             className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 flex items-center justify-center"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            variants={itemVariants}
+            whileHover={{ scale: 1.01 }}
+            transition={{ type: "spring", stiffness: 300 }}
           >
-            <div className="w-full max-w-2xl"> {/* Reduced from 3xl to 2xl */}
+            <motion.div 
+              className="w-full max-w-2xl"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2, duration: 0.3 }}
+            >
               <GameBoard
                 board={board}
                 currentPlayer={currentPlayer}
                 onCellClick={handleCellClick}
                 playerColors={playerColors}
               />
-            </div>
+            </motion.div>
           </motion.div>
-        </div>
+        </motion.div>
         
-        <div className="space-y-3 lg:space-y-4">
-          <PlayersList
-            players={players}
-            currentPlayer={currentPlayer}
-            playerColors={playerColors}
-          />
+        <motion.div 
+          className="space-y-3 lg:space-y-4"
+          variants={itemVariants}
+        >
+          <motion.div
+            variants={itemVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <PlayersList
+              players={players}
+              currentPlayer={currentPlayer}
+              playerColors={playerColors}
+            />
+          </motion.div>
           
-          <ChatWindow
-            messages={messages}
-            playerColors={playerColors}
-            onSendMessage={handleSendMessage}
-          />
+          <motion.div
+            variants={itemVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <ChatWindow
+              messages={messages}
+              playerColors={playerColors}
+              onSendMessage={handleSendMessage}
+            />
+          </motion.div>
           
-          {!gameStarted && players.find(p => p.id === currentPlayer)?.isAdmin && (
-            <motion.button
-              className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
-                       hover:bg-purple-700 transition-colors"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setGameStarted(true)}
-            >
-              Start Game
-            </motion.button>
-          )}
-        </div>
-      </div>
-    </div>
+          <AnimatePresence>
+            {!gameStarted && players.find(p => p.id === currentPlayer)?.isAdmin && (
+              <motion.button
+                className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
+                         hover:bg-purple-700 transition-colors"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                whileHover={{ 
+                  scale: 1.02,
+                  boxShadow: "0 0 10px rgba(147, 51, 234, 0.5)"
+                }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setGameStarted(true)}
+                transition={{ type: "spring", stiffness: 400 }}
+              >
+                Start Game
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 };
 

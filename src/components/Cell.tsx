@@ -43,7 +43,7 @@ const Cell: React.FC<CellProps> = ({
   return (
     <motion.div
       key={`${rowIndex}-${colIndex}`}
-      className="aspect-square border border-gray-700 rounded-sm bg-gray-800/50 
+      className="aspect-square border-1 border-gray-700 rounded-lg bg-gray-800/50 
                  backdrop-blur-sm hover:bg-gray-700/50 cursor-pointer overflow-hidden
                  transition-colors duration-200"
       initial="initial"
