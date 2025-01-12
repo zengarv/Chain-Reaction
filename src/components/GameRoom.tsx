@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS: GameSettings = {
 };
 
 const GameRoom: React.FC = () => {
+
   const { roomId } = useParams();
   const location = useLocation();
   const [board, setBoard] = useState<Cell[][]>([]);
@@ -144,25 +145,27 @@ const GameRoom: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-8">
-      <div className="max-w-7xl mx-auto grid grid-cols-4 gap-6">
-        <div className="col-span-3">
-          <h2 className="text-2xl font-bold text-white mb-8">Room: {roomId}</h2>
+    <div className="min-h-screen bg-gray-900 p-3 lg:p-4">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
+        <div className="lg:col-span-3">
+          <h2 className="text-2xl font-bold text-white mb-3">Room: {roomId}</h2>
           <motion.div 
-            className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6"
+            className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 flex items-center justify-center"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <GameBoard
-              board={board}
-              currentPlayer={currentPlayer}
-              onCellClick={handleCellClick}
-              playerColors={playerColors}
-            />
+            <div className="w-full max-w-2xl"> {/* Reduced from 3xl to 2xl */}
+              <GameBoard
+                board={board}
+                currentPlayer={currentPlayer}
+                onCellClick={handleCellClick}
+                playerColors={playerColors}
+              />
+            </div>
           </motion.div>
         </div>
         
-        <div className="space-y-6">
+        <div className="space-y-3 lg:space-y-4">
           <PlayersList
             players={players}
             currentPlayer={currentPlayer}
@@ -177,7 +180,7 @@ const GameRoom: React.FC = () => {
           
           {!gameStarted && players.find(p => p.id === currentPlayer)?.isAdmin && (
             <motion.button
-              className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg font-medium 
+              className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
                        hover:bg-purple-700 transition-colors"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
