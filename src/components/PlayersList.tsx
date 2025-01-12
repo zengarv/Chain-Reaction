@@ -1,83 +1,48 @@
 import React from 'react';
 import { Users, Crown } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-interface Player {
-  id: string;
-  isAdmin?: boolean;
-}
+import { Player } from '../types/game';
 
 interface PlayersListProps {
   players: Player[];
   currentPlayer: string;
-  playerColors: Record<string, string>;
+  gameStarted: boolean;
 }
 
-const PlayersList: React.FC<PlayersListProps> = ({
-  players,
-  currentPlayer,
-  playerColors,
-}) => {
+const PlayersList: React.FC<PlayersListProps> = ({ players, currentPlayer, gameStarted }) => {
   return (
-    <motion.div 
-      className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4"
-      whileHover={{ scale: 1.01 }}
-      transition={{ type: "spring", stiffness: 300 }}
-    >
-      <motion.div 
-        className="flex items-center space-x-2 mb-4"
-        whileHover={{ x: 5 }}
-      >
-        <motion.div
-          whileHover={{ rotate: 15, scale: 1.1 }}
-          transition={{ type: "spring", stiffness: 400 }}
-        >
-          <Users className="w-5 h-5 text-white" />
-        </motion.div>
-        <h2 className="text-lg font-semibold text-white">Players</h2>
-      </motion.div>
-      
+    <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4">
+      <h3 className="text-lg font-medium text-gray-300 mb-3">Players</h3>
       <div className="space-y-2">
         {players.map((player) => (
           <motion.div
             key={player.id}
-            className={`flex items-center justify-between p-3 rounded-lg
-              ${currentPlayer === player.id ? 'bg-gray-700/50' : 'bg-gray-800/30'}
-              hover:bg-gray-700/30 transition-colors`}
-            whileHover={{ scale: 1.03, x: 5 }}
-            whileTap={{ scale: 0.98 }}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
+            className={`flex items-center space-x-3 p-2 rounded-lg ${
+              player.id === currentPlayer ? 'bg-gray-700/50' : ''
+            }`}
+            animate={{
+              opacity: player.isActive ? 1 : 0.5,
+              scale: player.id === currentPlayer ? 1.02 : 1,
+            }}
           >
-            <div className="flex items-center space-x-2">
-              <motion.div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: playerColors[player.id] }}
-                whileHover={{ scale: 1.2 }}
-                transition={{ type: "spring", stiffness: 400 }}
-              />
-              <span className="font-medium text-white">Player {player.id}</span>
-            </div>
+            <div
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: player.color }}
+            />
+            <span className="text-gray-300">{player.name}</span>
             {player.isAdmin && (
-              <motion.div
-                whileHover={{ 
-                  scale: 1.2,
-                  rotate: 360,
-                  transition: {
-                    rotate: {
-                      duration: 1,
-                      ease: "linear"
-                    }
-                  }
-                }}
-              >
-                <Crown className="w-4 h-4 text-yellow-400" />
-              </motion.div>
+              <span className="text-xs text-purple-400 ml-auto">Admin</span>
+            )}
+            {!player.isActive && gameStarted && (
+              <span className="text-xs text-red-400 ml-auto">Eliminated</span>
+            )}
+            {player.id === currentPlayer && gameStarted && (
+              <span className="text-xs text-green-400 ml-auto">Current Turn</span>
             )}
           </motion.div>
         ))}
       </div>
-    </motion.div>
+    </div>
   );
 };
 

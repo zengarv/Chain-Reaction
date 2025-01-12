@@ -11,6 +11,7 @@ export interface Player {
   name: string;
   color: string;
   isAdmin: boolean;
+  isActive: boolean;
 }
 
 export interface Cell {

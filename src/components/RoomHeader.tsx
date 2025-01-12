@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Home, Copy, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Player } from '../types/game';
 
 interface RoomHeaderProps {
   roomId: string;
   playerCount: number;
+  currentPlayer: Player;
 }
 
 export const RoomHeader: React.FC<RoomHeaderProps> = ({ roomId, playerCount }) => {

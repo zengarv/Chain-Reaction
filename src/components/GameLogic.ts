@@ -1,19 +1,74 @@
-export interface Cell {
-    orbs: number;
-    playerId: string | null;
-  }
+import { Cell, Player} from '../types/game';
   
-  export class GameLogic {
+export class GameLogic {
     private board: Cell[][];
     private rows: number;
     private cols: number;
+    private players: Player[];
+    private currentPlayerIndex: number;
   
-    constructor(rows: number, cols: number, initialBoard?: Cell[][]) {
+    constructor(rows: number, cols: number, players: Player[], initialBoard?: Cell[][]) {
       this.rows = rows;
       this.cols = cols;
-      this.board = initialBoard || this.createEmptyBoard();
+      this.players = [...players];
+      this.currentPlayerIndex = 0;
+      this.board = initialBoard ? 
+        initialBoard.map(row => row.map(cell => ({...cell}))) : 
+        this.createEmptyBoard();
     }
   
+    public addOrb(row: number, col: number): boolean {
+      const currentPlayer = this.getCurrentPlayer();
+      if (!this.isValidMove(row, col, currentPlayer.id)) return false;
+  
+      // Create a new board with the updated cell
+      const newBoard = this.board.map(r => r.map(c => ({...c})));
+      const cell = newBoard[row][col];
+      const criticalMass = this.getCriticalMass(row, col);
+      
+      newBoard[row][col] = {
+        orbs: cell.orbs + 1,
+        playerId: currentPlayer.id
+      };
+  
+      this.board = newBoard;
+      return this.board[row][col].orbs >= criticalMass;
+    }
+  
+    public handleExplosions(
+      onExplode: (board: Cell[][]) => void,
+      delay: number
+    ): Promise<boolean> {
+      return new Promise(async (resolve) => {
+        let hasExploded = false;
+        let explosionOccurred = true;
+  
+        while (explosionOccurred) {
+          explosionOccurred = false;
+          const newBoard = this.board.map(row => row.map(cell => ({...cell})));
+  
+          for (let row = 0; row < this.rows; row++) {
+            for (let col = 0; col < this.cols; col++) {
+              const cell = newBoard[row][col];
+              if (cell.orbs >= this.getCriticalMass(row, col)) {
+                this.explodeCell(newBoard, row, col);
+                explosionOccurred = true;
+                hasExploded = true;
+              }
+            }
+          }
+  
+          if (explosionOccurred) {
+            this.board = newBoard;
+            onExplode(this.board);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+  
+        resolve(hasExploded);
+      });
+    }
+    
     private createEmptyBoard(): Cell[][] {
       return Array(this.rows).fill(null).map(() =>
         Array(this.cols).fill(null).map(() => ({ orbs: 0, playerId: null }))
@@ -36,59 +91,15 @@ export interface Cell {
       if (col < this.cols - 1) adjacent.push([row, col + 1]);
       return adjacent;
     }
-  
-    public addOrb(row: number, col: number, playerId: string): boolean {
-      if (!this.isValidMove(row, col, playerId)) return false;
-      
-      // Create a new board state
-      const newBoard = this.board.map(row => [...row]);
-      if (!newBoard[row][col].playerId) {
-        newBoard[row][col] = { orbs: 1, playerId };
-      } else {
-        newBoard[row][col] = {
-          ...newBoard[row][col],
-          orbs: newBoard[row][col].orbs + 1
-        };
+    
+      public isValidMove(row: number, col: number, playerId: string): boolean {
+        const cell = this.board[row][col];
+        // A move is valid if:
+        // 1. The cell is empty (no player owns it)
+        // 2. The current player owns the cell
+        return !cell.playerId || cell.playerId === playerId;
       }
-      
-      this.board = newBoard;
-      return this.board[row][col].orbs >= this.getCriticalMass(row, col);
-    }
-  
-    private isValidMove(row: number, col: number, playerId: string): boolean {
-      return !this.board[row][col].playerId || this.board[row][col].playerId === playerId;
-    }
-  
-    public async handleExplosions(
-      onExplode: (board: Cell[][]) => void,
-      delay: number
-    ): Promise<boolean> {
-      let hasExploded = false;
-      let explosionOccurred = true;
-  
-      while (explosionOccurred) {
-        explosionOccurred = false;
-        const newBoard = this.board.map(row => [...row]);
-  
-        for (let row = 0; row < this.rows; row++) {
-          for (let col = 0; col < this.cols; col++) {
-            if (newBoard[row][col].orbs >= this.getCriticalMass(row, col)) {
-              this.explodeCell(newBoard, row, col);
-              explosionOccurred = true;
-              hasExploded = true;
-            }
-          }
-        }
-  
-        if (explosionOccurred) {
-          this.board = newBoard;
-          onExplode(this.board);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-  
-      return hasExploded;
-    }
+    
   
     private explodeCell(board: Cell[][], row: number, col: number): void {
       const criticalMass = this.getCriticalMass(row, col);
@@ -108,8 +119,39 @@ export interface Cell {
       }
     }
   
+    public getCurrentPlayer(): Player {
+      return this.players[this.currentPlayerIndex];
+    }
+  
+    public getNextPlayer(): void {
+      do {
+        this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+      } while (!this.players[this.currentPlayerIndex].isActive);
+    }
+  
     public getBoard(): Cell[][] {
       return this.board;
+    }
+  
+    public updatePlayerStatus(): void {
+      this.players = this.players.map(player => ({
+        ...player,
+        isActive: player.isActive && !this.isPlayerEliminated(player.id)
+      }));
+    }
+  
+    private isPlayerEliminated(playerId: string): boolean {
+      return !this.board.some(row => 
+        row.some(cell => cell.playerId === playerId)
+      );
+    }
+  
+    public getActivePlayers(): Player[] {
+      return this.players.filter(player => player.isActive);
+    }
+  
+    public getPlayerById(id: string): Player | undefined {
+      return this.players.find(player => player.id === id);
     }
   }
   

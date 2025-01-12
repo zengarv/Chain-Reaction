@@ -1,13 +1,14 @@
 import React from 'react';
-import { Cell as CellType } from '../types/game';
+import { Cell as CellType, Player} from '../types/game';
 import Cell from './Cell';
 
 interface GameBoardProps {
   board: CellType[][];
-  currentPlayer: string;
   onCellClick: (row: number, col: number) => void;
+  currentPlayer: Player;
   playerColors: Record<string, string>;
 }
+
 
 const GameBoard: React.FC<GameBoardProps> = ({
   board,
