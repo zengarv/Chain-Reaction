@@ -29,6 +29,10 @@ const GameBoard: React.FC<GameBoardProps> = ({
   };
 
   const cellVariants = {
+    initial: {
+      scale: 1,
+      rotate: 0,
+    },
     explode: {
       scale: [1, 1.2, 0.8, 1],
       rotate: [0, 10, -10, 0],
@@ -55,8 +59,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
               className="aspect-square border-2 border-gray-700 rounded-lg bg-gray-800/50 
                        backdrop-blur-sm hover:bg-gray-700/50 cursor-pointer overflow-hidden
                        transition-colors duration-200"
+              initial="initial"
               variants={cellVariants}
-              animate={cell.orbs >= criticalMass ? "explode" : undefined}
+              animate={cell.orbs >= criticalMass ? "explode" : "initial"}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => onCellClick(rowIndex, colIndex)}
