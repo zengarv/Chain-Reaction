@@ -20,6 +20,7 @@ const PlayersList: React.FC<PlayersListProps> = ({
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [isShuffling, setIsShuffling] = useState(false);
 
   const handleEditStart = (player: Player) => {
     setEditingId(player.id);
@@ -32,6 +33,16 @@ const PlayersList: React.FC<PlayersListProps> = ({
     }
     setEditingId(null);
   };
+
+  const handleShuffle = async () => {
+    if (onShufflePlayers && !isShuffling) {
+      setIsShuffling(true);
+      onShufflePlayers();
+      setTimeout(() => setIsShuffling(false), 500);
+    }
+  };
+
+  const currentPlayerData = players.find(p => p.id === currentPlayer);
 
   return (
     <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4">
@@ -49,32 +60,69 @@ const PlayersList: React.FC<PlayersListProps> = ({
           <h2 className="text-lg font-semibold text-white">Players</h2>
         </motion.div>
         
-        {onShufflePlayers && !gameStarted && (
-          <motion.button
-            onClick={onShufflePlayers}
-            className="p-2 text-purple-400 hover:text-purple-300 transition-colors"
-            whileHover={{ scale: 1.1, rotate: 180 }}
-            whileTap={{ scale: 0.9 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Shuffle className="w-5 h-5" />
-          </motion.button>
-        )}
+        <div className="flex items-center gap-2">
+          {gameStarted && currentPlayerData && (
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-700/50"
+              style={{ minWidth: '140px' }}
+            >
+              <div 
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: currentPlayerData.color }}
+              />
+              <span 
+                className="text-sm font-medium truncate"
+                style={{ color: currentPlayerData.color }}
+              >
+                {currentPlayerData.name}'s Turn
+              </span>
+            </motion.div>
+          )}
+          
+          {onShufflePlayers && !gameStarted && (
+            <motion.button
+              onClick={handleShuffle}
+              className="p-2 text-purple-400 hover:text-purple-300 transition-colors"
+              whileHover={{ scale: 1.1, rotate: 180 }}
+              whileTap={{ scale: 0.9 }}
+              animate={isShuffling ? {
+                rotate: [0, 360],
+                transition: { duration: 0.5, ease: "linear" }
+              } : {}}
+              transition={{ duration: 0.3 }}
+              disabled={isShuffling}
+            >
+              <Shuffle className="w-5 h-5" />
+            </motion.button>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <AnimatePresence mode="wait">
+      <motion.div 
+        className="space-y-2"
+        animate={isShuffling ? {
+          scale: [1, 0.98, 1],
+          transition: { duration: 0.5 }
+        } : {}}
+      >
+        <AnimatePresence mode="popLayout">
           {players.map((player) => (
             <motion.div
               key={player.id}
               className={`flex items-center space-x-3 p-2 rounded-lg ${
                 player.id === currentPlayer ? 'bg-gray-700/50' : ''
               }`}
-              animate={{
+              layout
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ 
                 opacity: player.isActive ? 1 : 0.5,
                 scale: player.id === currentPlayer ? 1.02 : 1,
+                y: 0
               }}
-              layout
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
             >
               <div
                 className="w-3 h-3 rounded-full"
@@ -127,7 +175,7 @@ const PlayersList: React.FC<PlayersListProps> = ({
             </motion.div>
           ))}
         </AnimatePresence>
-      </div>
+      </motion.div>
     </div>
   );
 };
