@@ -12,6 +12,8 @@ interface CellProps {
   criticalMass: number;
   playerColors: Record<string, string>;
   onCellClick: (row: number, col: number) => void;
+  currentPlayer: string;
+  isLastMove: boolean;
 }
 
 const Cell: React.FC<CellProps> = ({
@@ -21,6 +23,8 @@ const Cell: React.FC<CellProps> = ({
   criticalMass,
   playerColors,
   onCellClick,
+  currentPlayer,
+  isLastMove,
 }) => {
   const isUnstable = cell.orbs === criticalMass - 1;
 
@@ -43,13 +47,19 @@ const Cell: React.FC<CellProps> = ({
   return (
     <motion.div
       key={`${rowIndex}-${colIndex}`}
-      className="aspect-square border-1 border-gray-700 rounded-lg bg-gray-800/50 
+      className="aspect-square border-2 border-transparent rounded-lg bg-gray-800/50 
                  backdrop-blur-sm hover:bg-gray-700/50 cursor-pointer overflow-hidden
                  transition-colors duration-200"
+      style={{
+        borderColor: isLastMove ? playerColors[cell.playerId!] : 'transparent',
+      }}
       initial="initial"
       variants={cellVariants}
       animate={cell.orbs >= criticalMass ? "explode" : "initial"}
-      whileHover={{ scale: 1.05 }}
+      whileHover={{ 
+        scale: 1.05,
+        borderColor: playerColors[currentPlayer],
+      }}
       whileTap={{ scale: 0.95 }}
       onClick={() => onCellClick(rowIndex, colIndex)}
       layout

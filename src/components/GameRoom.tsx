@@ -20,7 +20,6 @@ const PLAYER_COLORS = {
   player8: '#F0FEFB', // White
 };
 
-
 const DEFAULT_SETTINGS: GameSettings = {
   boardSize: { rows: 9, cols: 6 },
   maxPlayers: 2
@@ -37,13 +36,16 @@ const GameRoom: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [winner, setWinner] = useState<Player | null>(null);
+  const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(null);
 
-  // Initialize players and game logic based on settings
+  const updateBoard = useCallback((newBoard: Cell[][]) => {
+    setBoard([...newBoard]);
+  }, []);
+
   useEffect(() => {
     const settings = location.state?.settings || DEFAULT_SETTINGS;
     const { maxPlayers } = settings;
     
-    // Create initial players array based on maxPlayers
     const initialPlayers = Array.from({ length: maxPlayers }, (_, index) => ({
       id: `player${index + 1}`,
       name: index === 0 && location.state?.playerName ? 
@@ -54,7 +56,6 @@ const GameRoom: React.FC = () => {
       isActive: true
     }));
 
-    // Initialize game logic with the settings
     const newGameLogic = new GameLogic(
       settings.boardSize.rows,
       settings.boardSize.cols,
@@ -67,15 +68,12 @@ const GameRoom: React.FC = () => {
     setCurrentPlayer(newGameLogic.getCurrentPlayer());
   }, [location.state]);
 
-  const updateBoard = useCallback((newBoard: Cell[][]) => {
-    setBoard([...newBoard]);
-  }, []);
-
   const handleCellClick = async (row: number, col: number) => {
     if (!gameLogic || !currentPlayer || isExploding || !gameStarted) return;
   
     if (!gameLogic.isValidMove(row, col, currentPlayer.id)) return;
   
+    setLastMove({ row, col });
     const willExplode = gameLogic.addOrb(row, col);
     updateBoard(gameLogic.getBoard());
   
@@ -137,6 +135,7 @@ const GameRoom: React.FC = () => {
     setWinner(null);
     setGameStarted(false);
     setMessages([]);
+    setLastMove(null);
   };  
 
   const handleSendMessage = (text: string) => {
@@ -179,6 +178,7 @@ const GameRoom: React.FC = () => {
               currentPlayer={currentPlayer}
               onCellClick={handleCellClick}
               playerColors={PLAYER_COLORS}
+              lastMove={lastMove}
             />
           </motion.div>
         </motion.div>
@@ -222,6 +222,6 @@ const GameRoom: React.FC = () => {
       )}
     </motion.div>
   );
-}
+};
 
 export default GameRoom;

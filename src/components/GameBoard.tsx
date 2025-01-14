@@ -7,14 +7,15 @@ interface GameBoardProps {
   onCellClick: (row: number, col: number) => void;
   currentPlayer: Player;
   playerColors: Record<string, string>;
+  lastMove: { row: number; col: number } | null;
 }
-
 
 const GameBoard: React.FC<GameBoardProps> = ({
   board,
   currentPlayer,
   onCellClick,
   playerColors,
+  lastMove,
 }) => {
   const getCriticalMass = (row: number, col: number): number => {
     const isCorner = (row === 0 || row === board.length - 1) && 
@@ -41,6 +42,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
             criticalMass={getCriticalMass(rowIndex, colIndex)}
             playerColors={playerColors}
             onCellClick={onCellClick}
+            currentPlayer={currentPlayer.id}
+            isLastMove={lastMove?.row === rowIndex && lastMove?.col === colIndex}
           />
         ))
       )}
