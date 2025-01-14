@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, Shuffle } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 
 interface GameOverProps {
   winner: {
@@ -13,11 +13,12 @@ interface GameOverProps {
 
 const GameOver: React.FC<GameOverProps> = ({ winner, onPlayAgain, onShufflePlayers }) => {
   return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="absolute inset-0 flex items-center justify-center p-4 z-50">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-gray-800/90 rounded-xl p-6 max-w-md w-full text-center"
+        className="bg-gray-800/90 rounded-xl p-6 max-w-md w-full text-center relative"
       >
         <motion.div
           initial={{ rotate: -10, scale: 0.9 }}

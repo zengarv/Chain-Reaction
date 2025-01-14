@@ -188,7 +188,7 @@ const GameRoom: React.FC = () => {
       animate={{ opacity: 1 }}
     >
       <motion.div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
-        <motion.div className="lg:col-span-3">
+      <motion.div className="lg:col-span-3 relative">
           <RoomHeader 
             roomId={roomId || ''} 
             playerCount={players.length}
@@ -197,7 +197,7 @@ const GameRoom: React.FC = () => {
             onStartGame={handleStartGame}
           />
           
-          <motion.div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4">
+          <motion.div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">
             <GameBoard
               board={board}
               currentPlayer={currentPlayer}
@@ -205,6 +205,16 @@ const GameRoom: React.FC = () => {
               playerColors={PLAYER_COLORS}
               lastMove={lastMove}
             />
+            {winner && (
+              <GameOver
+                winner={{
+                  name: winner.name,
+                  color: winner.color
+                }}
+                onPlayAgain={handlePlayAgain}
+                onShufflePlayers={handleShufflePlayers}
+              />
+            )}
           </motion.div>
         </motion.div>
         
@@ -236,18 +246,7 @@ const GameRoom: React.FC = () => {
             </motion.button>
           )}
         </motion.div>
-      </motion.div>
-      
-      {winner && (
-        <GameOver
-          winner={{
-            name: winner.name,
-            color: winner.color
-          }}
-          onPlayAgain={handlePlayAgain}
-          onShufflePlayers={handleShufflePlayers}
-        />
-      )}
+      </motion.div>     
     </motion.div>
   );
 };
