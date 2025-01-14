@@ -1,20 +1,28 @@
 import { motion } from 'framer-motion';
-import React from 'react';
+import React, { useMemo } from 'react';
 
 interface OrbProps {
   color: string;
   count: number;
   isUnstable: boolean;
+  cellSize: number;
 }
 
-const Orb: React.FC<OrbProps> = ({ color, count, isUnstable }) => {
-  // Calculate positions for multiple orbs with wider spacing
+const Orb: React.FC<OrbProps> = ({ color, count, isUnstable, cellSize }) => {
+  // Calculate base orb size based on cell size
+  const orbSize = useMemo(() => {
+    const baseSize = Math.max(8, Math.min(16, cellSize / 4));
+    return Math.round(baseSize);
+  }, [cellSize]);
+
+  // Calculate animation radius based on cell size
   const getOrbPositions = (index: number, total: number) => {
-    const radius = total === 1 ? 0 : Math.min(30, 15 + total * 3); // Increased spacing
-    const angle = (index * 2 * Math.PI) / total + Math.random() * 0.5; // More random angle
+    const maxRadius = cellSize / 3;
+    const radius = total === 1 ? 0 : Math.min(maxRadius, maxRadius * 0.8);
+    const angle = (index * 2 * Math.PI) / total + Math.random() * 0.3;
     return {
-      x: Math.cos(angle) * radius * (0.8 + Math.random() * 0.4), // Random radius variation
-      y: Math.sin(angle) * radius * (0.8 + Math.random() * 0.4),
+      x: Math.cos(angle) * radius * (0.8 + Math.random() * 0.2),
+      y: Math.sin(angle) * radius * (0.8 + Math.random() * 0.2),
     };
   };
 
@@ -22,22 +30,22 @@ const Orb: React.FC<OrbProps> = ({ color, count, isUnstable }) => {
     idle: (i: number) => ({
       x: getOrbPositions(i, count).x,
       y: getOrbPositions(i, count).y,
-      scale: [1, 0.9 + Math.random() * 0.4, 1], // Random scale
+      scale: [1, 0.95 + Math.random() * 0.2, 1],
       transition: {
-        duration: 1.5 + Math.random(), // Random duration
+        duration: 1.2 + Math.random() * 0.3,
         repeat: Infinity,
         repeatType: "reverse" as const,
-        delay: i * 0.1 * Math.random(), // Random delay
+        delay: i * 0.1 * Math.random(),
         ease: "easeInOut",
       },
     }),
     unstable: (i: number) => ({
-      x: getOrbPositions(i, count).x + (Math.random() * 10 - 5),
-      y: getOrbPositions(i, count).y + (Math.random() * 10 - 5),
-      scale: [1, 1.2 + Math.random() * 0.3, 0.8 + Math.random() * 0.2, 1],
-      rotate: [0, 20 + Math.random() * 20, -20 - Math.random() * 20, 0],
+      x: getOrbPositions(i, count).x + (Math.random() * cellSize * 0.05),
+      y: getOrbPositions(i, count).y + (Math.random() * cellSize * 0.05),
+      scale: [1, 1.1 + Math.random() * 0.1, 0.9 + Math.random() * 0.1, 1],
+      rotate: [0, 10 + Math.random() * 10, -10 - Math.random() * 10, 0],
       transition: {
-        duration: 0.3 + Math.random() * 0.4,
+        duration: 0.2 + Math.random() * 0.2,
         repeat: Infinity,
         repeatType: "reverse" as const,
         ease: "easeInOut",
@@ -46,6 +54,9 @@ const Orb: React.FC<OrbProps> = ({ color, count, isUnstable }) => {
     }),
   };
 
+  // Calculate shadow size based on orb size
+  const shadowSize = Math.max(5, orbSize * 0.8);
+
   return (
     <div className="relative w-full h-full flex items-center justify-center">
       {Array.from({ length: count }).map((_, index) => (
@@ -53,12 +64,11 @@ const Orb: React.FC<OrbProps> = ({ color, count, isUnstable }) => {
           key={index}
           className="absolute"
           style={{
-            width: '16px',
-            height: '16px',
+            width: `${orbSize}px`,
+            height: `${orbSize}px`,
             backgroundColor: color,
             borderRadius: '50%',
-            // filter: `blur(2px) brightness(1.3)`, // Glow effect
-            boxShadow: `0 0 15px ${color}, 0 0 25px ${color}80`,
+            boxShadow: `0 0 ${shadowSize}px ${color}, 0 0 ${shadowSize * 1.5}px ${color}80`,
           }}
           variants={orbVariants}
           animate={isUnstable ? 'unstable' : 'idle'}

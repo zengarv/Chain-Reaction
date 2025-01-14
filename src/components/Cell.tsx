@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Orb from './Orb';
 
@@ -26,7 +26,27 @@ const Cell: React.FC<CellProps> = ({
   currentPlayer,
   isLastMove,
 }) => {
+  const cellRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState({ width: 0, height: 0 });
   const isUnstable = cell.orbs === criticalMass - 1;
+
+  useEffect(() => {
+    const updateCellSize = () => {
+      if (cellRef.current) {
+        const { width, height } = cellRef.current.getBoundingClientRect();
+        setCellSize({ width, height });
+      }
+    };
+
+    updateCellSize();
+    const resizeObserver = new ResizeObserver(updateCellSize);
+    
+    if (cellRef.current) {
+      resizeObserver.observe(cellRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
 
   const cellVariants = {
     initial: {
@@ -34,10 +54,10 @@ const Cell: React.FC<CellProps> = ({
       rotate: 0,
     },
     explode: {
-      scale: [1, 1.2, 0.8, 1],
-      rotate: [0, 10, -10, 0],
+      scale: [1, 1.1, 0.9, 1], // Reduced scale for smaller cells
+      rotate: [0, 5, -5, 0], // Reduced rotation for smaller cells
       transition: {
-        duration: 0.5,
+        duration: 0.4,
         ease: "easeInOut",
         times: [0, 0.2, 0.5, 1],
       }
@@ -46,6 +66,7 @@ const Cell: React.FC<CellProps> = ({
 
   return (
     <motion.div
+      ref={cellRef}
       key={`${rowIndex}-${colIndex}`}
       className="aspect-square border-2 border-transparent rounded-lg bg-gray-800/50 
                  backdrop-blur-sm hover:bg-gray-700/50 cursor-pointer overflow-hidden
@@ -57,10 +78,10 @@ const Cell: React.FC<CellProps> = ({
       variants={cellVariants}
       animate={cell.orbs >= criticalMass ? "explode" : "initial"}
       whileHover={{ 
-        scale: 1.05,
+        scale: 1.02, // Reduced hover scale
         borderColor: playerColors[currentPlayer],
       }}
-      whileTap={{ scale: 0.95 }}
+      whileTap={{ scale: 0.98 }}
       onClick={() => onCellClick(rowIndex, colIndex)}
       layout
     >
@@ -71,10 +92,10 @@ const Cell: React.FC<CellProps> = ({
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ 
-              scale: 1.5, 
+              scale: 1.2, // Reduced exit scale
               opacity: 0,
               transition: { 
-                duration: 0.3,
+                duration: 0.2,
                 ease: "easeOut"
               }
             }}
@@ -84,6 +105,7 @@ const Cell: React.FC<CellProps> = ({
               color={playerColors[cell.playerId!]}
               count={cell.orbs}
               isUnstable={isUnstable}
+              cellSize={Math.min(cellSize.width, cellSize.height)}
             />
           </motion.div>
         )}
