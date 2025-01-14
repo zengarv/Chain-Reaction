@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [boardSize, setBoardSize] = useState({ rows: 6, cols: 6 });
+  const [boardSize, setBoardSize] = useState({ rows: 9, cols: 6 });
   const [maxPlayers, setMaxPlayers] = useState(2);
 
   const createRoom = () => {
