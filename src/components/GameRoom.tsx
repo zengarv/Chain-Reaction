@@ -138,6 +138,29 @@ const GameRoom: React.FC = () => {
     setLastMove(null);
   };  
 
+  const handleRenamePlayer = (playerId: string, newName: string) => {
+    setPlayers(prevPlayers =>
+      prevPlayers.map(player =>
+        player.id === playerId
+          ? { ...player, name: newName }
+          : player
+      )
+    );
+  };
+
+  const handleShufflePlayers = () => {
+    setPlayers(prevPlayers => {
+      const shuffled = [...prevPlayers];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = shuffled[i].name;
+        shuffled[i] = { ...shuffled[i], name: shuffled[j].name };
+        shuffled[j] = { ...shuffled[j], name: temp };
+      }
+      return shuffled;
+    });
+  };
+
   const handleSendMessage = (text: string) => {
     if (!gameLogic || !currentPlayer) return;
     
@@ -190,6 +213,8 @@ const GameRoom: React.FC = () => {
             players={players}
             currentPlayer={currentPlayer.id}
             gameStarted={gameStarted}
+            onRenamePlayer={handleRenamePlayer}
+            onShufflePlayers={handleShufflePlayers}
           />
           
           <ChatWindow
@@ -220,6 +245,7 @@ const GameRoom: React.FC = () => {
             color: winner.color
           }}
           onPlayAgain={handlePlayAgain}
+          onShufflePlayers={handleShufflePlayers}
         />
       )}
     </motion.div>
