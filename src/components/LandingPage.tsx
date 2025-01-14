@@ -6,12 +6,10 @@ import { motion } from 'framer-motion';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [playerName, setPlayerName] = useState('');
   const [boardSize, setBoardSize] = useState({ rows: 6, cols: 6 });
   const [maxPlayers, setMaxPlayers] = useState(2);
 
   const createRoom = () => {
-    if (!playerName.trim()) return;
     const roomId = nanoid(10);
     navigate(`/room/${roomId}`, {
       state: { isAdmin: true, settings: { boardSize, maxPlayers } }
@@ -74,19 +72,6 @@ const LandingPage: React.FC = () => {
 
         <div className="space-y-6">
           <motion.div variants={itemVariants}>
-            <label className="block text-sm font-medium mb-2">Player Name</label>
-            <motion.input
-              type="text"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500"
-              placeholder="Enter your name"
-              whileFocus={{ scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
             <label className="block text-sm font-medium mb-2">Board Size</label>
             <div className="grid grid-cols-2 gap-4">
               <motion.div whileHover={{ scale: 1.02 }}>
@@ -129,7 +114,6 @@ const LandingPage: React.FC = () => {
 
           <motion.button
             onClick={createRoom}
-            disabled={!playerName.trim()}
             className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium
                      disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             variants={itemVariants}
