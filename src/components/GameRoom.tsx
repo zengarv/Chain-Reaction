@@ -170,6 +170,8 @@ const GameRoom: React.FC = () => {
             roomId={roomId || ''} 
             playerCount={players.length}
             currentPlayer={currentPlayer}
+            showStartButton={!gameStarted && currentPlayer.isAdmin && players.length >= 2}
+            onStartGame={handleStartGame}
           />
           
           <motion.div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4">
@@ -198,10 +200,10 @@ const GameRoom: React.FC = () => {
           
           {!gameStarted && currentPlayer.isAdmin && (
             <motion.button
-              className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
+              className="hidden lg:block w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
                        hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={handleStartGame}
               disabled={players.length < 2}
             >

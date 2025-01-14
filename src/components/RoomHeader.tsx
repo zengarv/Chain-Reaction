@@ -8,9 +8,16 @@ interface RoomHeaderProps {
   roomId: string;
   playerCount: number;
   currentPlayer: Player;
+  showStartButton: boolean;
+  onStartGame: () => void;
 }
 
-export const RoomHeader: React.FC<RoomHeaderProps> = ({ roomId, playerCount }) => {
+export const RoomHeader: React.FC<RoomHeaderProps> = ({ 
+  roomId, 
+  playerCount, 
+  showStartButton,
+  onStartGame 
+}) => {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
 
@@ -26,13 +33,13 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({ roomId, playerCount }) =
       whileHover={{ scale: 1.01 }}
       transition={{ type: "spring", stiffness: 300 }}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center space-x-3">
           <motion.div
             whileHover={{ rotate: 15, scale: 1.1 }}
             transition={{ type: "spring", stiffness: 400 }}
           >
-            <Home className="w-6 h-6 text-purple-400" 
+            <Home className="w-6 h-6 text-purple-400 cursor-pointer" 
                 onClick={() => navigate('/')}
             />
           </motion.div>
@@ -55,15 +62,29 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({ roomId, playerCount }) =
           </div>
         </div>
         
-        <motion.div 
-          className="hidden md:flex items-center space-x-2 bg-gray-700/50 px-3 py-1 rounded-full"
-          whileHover={{ scale: 1.05 }}
-        >
-          <div className="w-2 h-2 bg-green-400 rounded-full" />
-          <span className="text-sm text-gray-300">
-            {playerCount} Players Connected
-          </span>
-        </motion.div>
+        <div className="flex items-center gap-4 ml-auto">
+          {showStartButton && (
+            <motion.button
+              className="lg:hidden bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
+                       hover:bg-purple-700 transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onStartGame}
+            >
+              Start Game
+            </motion.button>
+          )}
+          
+          <motion.div 
+            className="hidden md:flex items-center space-x-2 bg-gray-700/50 px-3 py-1 rounded-full"
+            whileHover={{ scale: 1.05 }}
+          >
+            <div className="w-2 h-2 bg-green-400 rounded-full" />
+            <span className="text-sm text-gray-300">
+              {playerCount} Players Connected
+            </span>
+          </motion.div>
+        </div>
       </div>
     </motion.div>
   );
