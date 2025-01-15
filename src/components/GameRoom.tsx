@@ -124,21 +124,32 @@ const GameRoom: React.FC = () => {
 
   const handlePlayAgain = () => {
     const settings = location.state?.settings || DEFAULT_SETTINGS;
+    const { maxPlayers } = settings;
     
-    // Reset only game state while keeping player names
-    setPlayers(prevPlayers => 
-      prevPlayers.map(player => ({
-        ...player,
-        isActive: true
-      }))
+    // Create fresh players array with preserved names
+    const initialPlayers = players.map(player => ({
+      ...player,
+      isActive: true // Reset active status
+    }));
+  
+    // Create new game logic instance
+    const newGameLogic = new GameLogic(
+      settings.boardSize.rows,
+      settings.boardSize.cols,
+      initialPlayers
     );
-    
-    initializeGame(players, settings);
+  
+    // Explicitly reset all game state
+    setGameLogic(newGameLogic);
+    setBoard(newGameLogic.getBoard());
+    setPlayers(initialPlayers);
+    setCurrentPlayer(newGameLogic.getCurrentPlayer());
     setWinner(null);
     setGameStarted(false);
     setMessages([]);
     setLastMove(null);
-  };  
+    setIsExploding(false); // Add this line to ensure explosion state is reset
+  };
 
   const handleRenamePlayer = (playerId: string, newName: string) => {
     setPlayers(prevPlayers =>

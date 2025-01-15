@@ -13,12 +13,18 @@ export class GameLogic {
     this.cols = cols;
     this.players = [...players];
     this.currentPlayerIndex = 0;
-    this.board = initialBoard ? 
-      initialBoard.map(row => row.map(cell => ({...cell}))) : 
-      this.createEmptyBoard();
-    // Set maximum number of iterations based on board size
+    this.board = this.createEmptyBoard(); // Always create a fresh board on construction
     this.maxExplosionIterations = rows * cols * 2;
   }
+
+  // Add a new method to explicitly reset the game state
+  public resetGame(players: Player[]): void {
+    this.board = this.createEmptyBoard();
+    this.players = [...players];
+    this.currentPlayerIndex = 0;
+  }
+
+
   
   public addOrb(row: number, col: number): boolean {
     const currentPlayer = this.getCurrentPlayer();
@@ -145,8 +151,12 @@ export class GameLogic {
   }
 
   private createEmptyBoard(): Cell[][] {
+    // Ensure each cell is properly initialized with null values
     return Array(this.rows).fill(null).map(() =>
-      Array(this.cols).fill(null).map(() => ({ orbs: 0, playerId: null }))
+      Array(this.cols).fill(null).map(() => ({ 
+        orbs: 0, 
+        playerId: null 
+      }))
     );
   }
 
