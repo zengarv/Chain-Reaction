@@ -56,17 +56,21 @@ const GameRoom: React.FC = () => {
       isActive: true
     }));
 
+    setPlayers(initialPlayers);
+    initializeGame(initialPlayers, settings);
+  }, [location.state]);
+
+  const initializeGame = (gamePlayers: Player[], settings: GameSettings) => {
     const newGameLogic = new GameLogic(
       settings.boardSize.rows,
       settings.boardSize.cols,
-      initialPlayers
+      gamePlayers
     );
 
     setGameLogic(newGameLogic);
     setBoard(newGameLogic.getBoard());
-    setPlayers(initialPlayers);
     setCurrentPlayer(newGameLogic.getCurrentPlayer());
-  }, [location.state]);
+  };
 
   const handleCellClick = async (row: number, col: number) => {
     if (!gameLogic || !currentPlayer || isExploding || !gameStarted) return;
@@ -81,57 +85,55 @@ const GameRoom: React.FC = () => {
       setIsExploding(true);
       await gameLogic.handleExplosions(updateBoard, 200);
       gameLogic.updatePlayerStatus();
-      const activePlayers = gameLogic.getActivePlayers();
       
+      // Update only the active status of players
+      setPlayers(prevPlayers => 
+        prevPlayers.map(player => ({
+          ...player,
+          isActive: gameLogic.getActivePlayers().some(p => p.id === player.id)
+        }))
+      );
+      
+      const activePlayers = gameLogic.getActivePlayers();
       if (activePlayers.length <= 1) {
         setGameStarted(false);
-        setWinner(activePlayers[0] || currentPlayer);
+        // Find the winning player from the current players array to preserve the name
+        const winningPlayer = players.find(p => p.id === (activePlayers[0]?.id || currentPlayer.id));
+        setWinner(winningPlayer || currentPlayer);
       } else {
         gameLogic.getNextPlayer();
-        const nextPlayer = gameLogic.getCurrentPlayer();
-        setCurrentPlayer(nextPlayer);
+        setCurrentPlayer(gameLogic.getCurrentPlayer());
       }
       
-      setPlayers(activePlayers);
       setIsExploding(false);
     } else {
       gameLogic.getNextPlayer();
-      const nextPlayer = gameLogic.getCurrentPlayer();
-      setCurrentPlayer(nextPlayer);
-      setPlayers(gameLogic.getActivePlayers());
+      setCurrentPlayer(gameLogic.getCurrentPlayer());
     }
   };  
 
   const handleStartGame = () => {
     if (players.length >= 2) {
       setGameStarted(true);
+      // Reset the game state to ensure a clean start
+      const settings = location.state?.settings || DEFAULT_SETTINGS;
+      initializeGame(players, settings);
     }
   };
 
+
   const handlePlayAgain = () => {
     const settings = location.state?.settings || DEFAULT_SETTINGS;
-    const { maxPlayers } = settings;
     
-    const initialPlayers = Array.from({ length: maxPlayers }, (_, index) => ({
-      id: `player${index + 1}`,
-      name: index === 0 && location.state?.playerName ? 
-        location.state.playerName : 
-        `Player ${index + 1}`,
-      color: PLAYER_COLORS[`player${index + 1}` as keyof typeof PLAYER_COLORS],
-      isAdmin: index === 0,
-      isActive: true
-    }));
-  
-    const newGameLogic = new GameLogic(
-      settings.boardSize.rows,
-      settings.boardSize.cols,
-      initialPlayers
+    // Reset only game state while keeping player names
+    setPlayers(prevPlayers => 
+      prevPlayers.map(player => ({
+        ...player,
+        isActive: true
+      }))
     );
-  
-    setGameLogic(newGameLogic);
-    setBoard(newGameLogic.getBoard());
-    setPlayers(initialPlayers);
-    setCurrentPlayer(newGameLogic.getCurrentPlayer());
+    
+    initializeGame(players, settings);
     setWinner(null);
     setGameStarted(false);
     setMessages([]);
@@ -188,7 +190,7 @@ const GameRoom: React.FC = () => {
       animate={{ opacity: 1 }}
     >
       <motion.div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
-      <motion.div className="lg:col-span-3 relative">
+        <motion.div className="lg:col-span-3 relative">
           <RoomHeader 
             roomId={roomId || ''} 
             playerCount={players.length}
@@ -231,6 +233,7 @@ const GameRoom: React.FC = () => {
             messages={messages}
             playerColors={PLAYER_COLORS}
             onSendMessage={handleSendMessage}
+            players={players}
           />
           
           {!gameStarted && currentPlayer.isAdmin && (

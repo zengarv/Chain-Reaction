@@ -24,7 +24,7 @@ const PlayersList: React.FC<PlayersListProps> = ({
 
   const handleEditStart = (player: Player) => {
     setEditingId(player.id);
-    setEditName(player.name);
+    setEditName('');
   };
 
   const handleEditSubmit = (playerId: string) => {
@@ -139,6 +139,7 @@ const PlayersList: React.FC<PlayersListProps> = ({
                   onBlur={() => handleEditSubmit(player.id)}
                   onKeyDown={(e) => e.key === 'Enter' && handleEditSubmit(player.id)}
                   className="bg-gray-700 text-white px-2 py-1 rounded outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder={player.name}
                   autoFocus
                 />
               ) : (
@@ -157,14 +158,14 @@ const PlayersList: React.FC<PlayersListProps> = ({
                 </div>
               )}
 
-              {player.isAdmin && (
+              {/* {player.isAdmin && (
                 <motion.div
                   whileHover={{ translateY: -5, scale: 1.1 }}
                   transition={{ type: "spring", stiffness: 400 }}
                 >
                   <Crown className="w-4 h-4 text-yellow-400" />
                 </motion.div>
-              )}
+              )} */}
               
               {!player.isActive && gameStarted && (
                 <span className="text-xs text-red-400 ml-auto">Eliminated</span>

@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { MessageCircle, Send } from 'lucide-react';
-import { Message } from '../types/game';
+import { Message, Player } from '../types/game';
 import { motion } from 'framer-motion';
 
 interface ChatWindowProps {
   messages: Message[];
   playerColors: Record<string, string>;
   onSendMessage: (message: string) => void;
+  players: Player[]; // Add players prop
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
   messages,
   playerColors,
   onSendMessage,
+  players,
 }) => {
   const [newMessage, setNewMessage] = useState('');
 
@@ -22,6 +24,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       onSendMessage(newMessage);
       setNewMessage('');
     }
+  };
+
+  // Function to get player name from ID
+  const getPlayerName = (playerId: string) => {
+    const player = players.find(p => p.id === playerId);
+    return player ? player.name : playerId;
   };
 
   return (
@@ -53,7 +61,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             whileHover={{ scale: 1.02, x: 5 }}
           >
             <span className="font-medium" style={{ color: playerColors[msg.playerId] }}>
-              Player {msg.playerId}:
+              {getPlayerName(msg.playerId)}:
             </span>{' '}
             <span className="text-white">{msg.text}</span>
           </motion.div>
@@ -80,7 +88,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             whileTap={{ translateX: 2, translateY: -2, scale: 1.1 }}
             transition={{ type: "spring", stiffness: 400 }}
           >
-          <Send className="w-4 h-4 text-white" />
+            <Send className="w-4 h-4 text-white" />
           </motion.div>
         </motion.button>
       </form>

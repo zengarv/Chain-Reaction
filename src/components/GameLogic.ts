@@ -91,6 +91,7 @@ export class GameLogic {
       resolve(hasExploded);
     });
   }
+
   private getBoardStateString(board: Cell[][]): string {
     return board.map(row => 
       row.map(cell => 
@@ -143,89 +144,114 @@ export class GameLogic {
     }));
   }
 
-    private createEmptyBoard(): Cell[][] {
-      return Array(this.rows).fill(null).map(() =>
-        Array(this.cols).fill(null).map(() => ({ orbs: 0, playerId: null }))
-      );
-    }
-  
-    private getCriticalMass(row: number, col: number): number {
-      const isCorner = (row === 0 || row === this.rows - 1) && 
-                      (col === 0 || col === this.cols - 1);
-      const isEdge = row === 0 || col === 0 || 
-                     row === this.rows - 1 || col === this.cols - 1;
-      return isCorner ? 2 : isEdge ? 3 : 4;
-    }
-  
-    private getAdjacentCells(row: number, col: number): [number, number][] {
-      const adjacent: [number, number][] = [];
-      if (row > 0) adjacent.push([row - 1, col]);
-      if (row < this.rows - 1) adjacent.push([row + 1, col]);
-      if (col > 0) adjacent.push([row, col - 1]);
-      if (col < this.cols - 1) adjacent.push([row, col + 1]);
-      return adjacent;
+  private createEmptyBoard(): Cell[][] {
+    return Array(this.rows).fill(null).map(() =>
+      Array(this.cols).fill(null).map(() => ({ orbs: 0, playerId: null }))
+    );
+  }
+
+  private getCriticalMass(row: number, col: number): number {
+    const isCorner = (row === 0 || row === this.rows - 1) && 
+                    (col === 0 || col === this.cols - 1);
+    const isEdge = row === 0 || col === 0 || 
+                   row === this.rows - 1 || col === this.cols - 1;
+    return isCorner ? 2 : isEdge ? 3 : 4;
+  }
+
+  private getAdjacentCells(row: number, col: number): [number, number][] {
+    const adjacent: [number, number][] = [];
+    if (row > 0) adjacent.push([row - 1, col]);
+    if (row < this.rows - 1) adjacent.push([row + 1, col]);
+    if (col > 0) adjacent.push([row, col - 1]);
+    if (col < this.cols - 1) adjacent.push([row, col + 1]);
+    return adjacent;
+  }
+    
+  public isValidMove(row: number, col: number, playerId: string): boolean {
+    if (!this.players[this.currentPlayerIndex].isActive) {
+      return false;
     }
     
-      public isValidMove(row: number, col: number, playerId: string): boolean {
-        const cell = this.board[row][col];
-        // A move is valid if:
-        // 1. The cell is empty (no player owns it)
-        // 2. The current player owns the cell
-        return !cell.playerId || cell.playerId === playerId;
-      }
+    if (this.players[this.currentPlayerIndex].id !== playerId) {
+      return false;
+    }
+
+    const cell = this.board[row][col];
+    // A move is valid if:
+    // 1. The cell is empty (no player owns it)
+    // 2. The current player owns the cell
+    return !cell.playerId || cell.playerId === playerId;
+  }
+
+  private explodeCell(board: Cell[][], row: number, col: number): void {
+    const criticalMass = this.getCriticalMass(row, col);
+    const currentPlayerId = board[row][col].playerId;
     
-  
-    private explodeCell(board: Cell[][], row: number, col: number): void {
-      const criticalMass = this.getCriticalMass(row, col);
-      const currentPlayerId = board[row][col].playerId;
-      
-      board[row][col] = {
-        orbs: board[row][col].orbs - criticalMass,
-        playerId: board[row][col].orbs - criticalMass > 0 ? currentPlayerId : null
+    board[row][col] = {
+      orbs: board[row][col].orbs - criticalMass,
+      playerId: board[row][col].orbs - criticalMass > 0 ? currentPlayerId : null
+    };
+
+    const adjacent = this.getAdjacentCells(row, col);
+    for (const [adjRow, adjCol] of adjacent) {
+      board[adjRow][adjCol] = {
+        orbs: board[adjRow][adjCol].orbs + 1,
+        playerId: currentPlayerId
       };
-  
-      const adjacent = this.getAdjacentCells(row, col);
-      for (const [adjRow, adjCol] of adjacent) {
-        board[adjRow][adjCol] = {
-          orbs: board[adjRow][adjCol].orbs + 1,
-          playerId: currentPlayerId
-        };
-      }
-    }
-  
-    public getCurrentPlayer(): Player {
-      return this.players[this.currentPlayerIndex];
-    }
-  
-    public getNextPlayer(): void {
-      do {
-        this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
-      } while (!this.players[this.currentPlayerIndex].isActive);
-    }
-  
-    public getBoard(): Cell[][] {
-      return this.board;
-    }
-  
-    public updatePlayerStatus(): void {
-      this.players = this.players.map(player => ({
-        ...player,
-        isActive: player.isActive && !this.isPlayerEliminated(player.id)
-      }));
-    }
-  
-    private isPlayerEliminated(playerId: string): boolean {
-      return !this.board.some(row => 
-        row.some(cell => cell.playerId === playerId)
-      );
-    }
-  
-    public getActivePlayers(): Player[] {
-      return this.players.filter(player => player.isActive);
-    }
-  
-    public getPlayerById(id: string): Player | undefined {
-      return this.players.find(player => player.id === id);
     }
   }
-  
+
+  public getCurrentPlayer(): Player {
+    return this.players[this.currentPlayerIndex];
+  }
+
+  public getNextPlayer(): void {
+    let nextIndex = (this.currentPlayerIndex + 1) % this.players.length;
+    let loopCount = 0;
+    
+    // Keep looking for the next active player
+    while (!this.players[nextIndex].isActive && loopCount < this.players.length) {
+      nextIndex = (nextIndex + 1) % this.players.length;
+      loopCount++;
+    }
+    
+    // If we've gone through all players and found none active, stay on current player
+    if (loopCount < this.players.length) {
+      this.currentPlayerIndex = nextIndex;
+    }
+  }
+
+  public getBoard(): Cell[][] {
+    return this.board;
+  }
+
+  public updatePlayerStatus(): void {
+    const activePlayers = this.players.filter(player => 
+      this.board.some(row => row.some(cell => cell.playerId === player.id))
+    );
+    
+    this.players = this.players.map(player => ({
+      ...player,
+      isActive: activePlayers.some(p => p.id === player.id)
+    }));
+
+    // If current player is not active, move to next active player
+    if (!this.players[this.currentPlayerIndex].isActive) {
+      this.getNextPlayer();
+    }
+  }
+
+  private isPlayerEliminated(playerId: string): boolean {
+    return !this.board.some(row => 
+      row.some(cell => cell.playerId === playerId)
+    );
+  }
+
+  public getActivePlayers(): Player[] {
+    return this.players.filter(player => player.isActive);
+  }
+
+  public getPlayerById(id: string): Player | undefined {
+    return this.players.find(player => player.id === id);
+  }
+}
