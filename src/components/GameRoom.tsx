@@ -76,40 +76,58 @@ const GameRoom: React.FC = () => {
   const [winner, setWinner] = useState<Player | null>(null);
   const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(null);
 
-  // Connect via Socket.IO.
+  // In GameRoom.tsx, inside the useEffect that connects to the room:
   useEffect(() => {
-    socket.emit("joinRoom", { roomId, playerName: initialPlayerName, isAdmin });
-  
+    socket.emit("joinRoom", { 
+      roomId, 
+      playerName: initialPlayerName, 
+      isAdmin, 
+      gridSize: isAdmin ? (location.state?.settings?.boardSize || DEFAULT_SETTINGS.boardSize) : undefined 
+    });
+    
     const handlePlayerListUpdate = (updatedPlayers: Player[]) => setPlayers(updatedPlayers);
     const handleChatMessage = (msg: Message) => setMessages(prev => [...prev, msg]);
-  
+
     socket.on("playerListUpdate", handlePlayerListUpdate);
     socket.on("chatMessage", handleChatMessage);
-  
+
     return () => {
       socket.off("playerListUpdate", handlePlayerListUpdate);
       socket.off("chatMessage", handleChatMessage);
     };
   }, [roomId, initialPlayerName, isAdmin]);
 
+useEffect(() => {
+  socket.on("gridSizeUpdate", (gridSize: { rows: number; cols: number }) => {
+    // Re‑initialize game logic using the grid size from the server and current players list.
+    const newLogic = new GameLogic(gridSize.rows, gridSize.cols, players);
+    setGameLogic(newLogic);
+    setBoard(newLogic.getBoard());
+  });
+
+  return () => {
+    socket.off("gridSizeUpdate");
+  };
+}, [players]);
+
+
   // For the admin: reinitialize the game logic (using settings from location.state if available).
   useEffect(() => {
     if (isAdmin) {
       const settings = location.state?.settings || DEFAULT_SETTINGS;
-      const adminPlayer: Player = {
-        id: initialPlayerName,
-        name: initialPlayerName,
-        color: PLAYER_COLORS.player1,
-        isAdmin: true,
-        isActive: true,
-      };
-      const newGameLogic = new GameLogic(settings.boardSize.rows, settings.boardSize.cols, [adminPlayer]);
-      setGameLogic(newGameLogic);
-      setBoard(newGameLogic.getBoard());
-      setCurrentPlayer(adminPlayer);
-      setPlayers([adminPlayer]);
+      socket.emit("setGridSize", { roomId, gridSize: settings.boardSize });
     }
-  }, [isAdmin, initialPlayerName, location.state]);
+  
+    socket.on("gridSizeUpdate", (gridSize: { rows: number; cols: number }) => {
+      setGameLogic(new GameLogic(gridSize.rows, gridSize.cols, players));
+      setBoard(new GameLogic(gridSize.rows, gridSize.cols, players).getBoard());
+    });
+  
+    return () => {
+      socket.off("gridSizeUpdate");
+    };
+  }, [isAdmin, players]);
+  
 
   // For non-admins: initialize a default game state (so the board is visible) and listen for gameStart.
   useEffect(() => {
