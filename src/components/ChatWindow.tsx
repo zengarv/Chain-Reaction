@@ -1,5 +1,4 @@
-// ChatWindow.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send } from 'lucide-react';
 import { Message, Player } from '../types/game';
 import { motion } from 'framer-motion';
@@ -19,6 +18,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   currentPlayerName, 
 }) => {
   const [newMessage, setNewMessage] = useState('');
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +69,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         <h2 className="text-lg font-semibold text-white">Chat</h2>
       </motion.div>
       
-      <div className="flex-1 overflow-y-auto mb-4 space-y-2">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto mb-4 space-y-2 pr-2 custom-scrollbar"
+      >
         {messages.map((msg) => {
           const senderName = getPlayerName(msg.playerId);
           // Remove duplicate sender name if the message text already begins with it

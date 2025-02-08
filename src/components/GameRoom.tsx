@@ -246,7 +246,7 @@ useEffect(() => {
     <div className="min-h-screen bg-gray-900 relative">
       {/* Main UI is always rendered */}
       <motion.div className="p-3 lg:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
           <div className="lg:col-span-3 relative">
             <RoomHeader 
               roomId={roomId || ''} 
@@ -272,7 +272,7 @@ useEffect(() => {
               )}
             </div>
           </div>
-          <div className="space-y-3 lg:space-y-4">
+          <div className="space-y-3 lg:space-y-4 lg:min-w-[320px]">
             <PlayersList
               players={players}
               currentPlayer={currentPlayer.id}
