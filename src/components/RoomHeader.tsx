@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, Copy, Check } from 'lucide-react';
+import { Home, Copy, Check, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Player } from '../types/game';
 import { useNavigate } from 'react-router-dom';
@@ -10,13 +10,17 @@ interface RoomHeaderProps {
   currentPlayer: Player;
   showStartButton: boolean;
   onStartGame: () => void;
+  gameStarted: boolean;
+  isAdmin: boolean;
 }
 
 export const RoomHeader: React.FC<RoomHeaderProps> = ({ 
   roomId, 
   playerCount, 
   showStartButton,
-  onStartGame 
+  onStartGame,
+  gameStarted,
+  isAdmin
 }) => {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
@@ -27,7 +31,6 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  
   return (
     <motion.div 
       className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 mb-3"
@@ -64,6 +67,20 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
         </div>
         
         <div className="flex items-center gap-4 ml-auto">
+          {!gameStarted && (
+            <motion.div 
+              className="flex items-center gap-2 text-gray-300"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Clock className="w-4 h-4 text-purple-400" />
+              <span className="text-sm">
+                {isAdmin ? "Waiting for players..." : "Waiting for admin..."}
+              </span>
+            </motion.div>
+          )}
+          
           {showStartButton && (
             <motion.button
               className="lg:hidden bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 

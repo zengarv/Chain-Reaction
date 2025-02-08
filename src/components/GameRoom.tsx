@@ -244,7 +244,6 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gray-900 relative">
-      {/* Main UI is always rendered */}
       <motion.div className="p-3 lg:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
           <div className="lg:col-span-3 relative">
@@ -254,6 +253,8 @@ useEffect(() => {
               currentPlayer={currentPlayer}
               showStartButton={!gameStarted && currentPlayer.isAdmin && players.length >= 2}
               onStartGame={handleStartGame}
+              gameStarted={gameStarted}
+              isAdmin={isAdmin}
             />
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">
               <GameBoard
@@ -299,16 +300,6 @@ useEffect(() => {
           </div>
         </div>
       </motion.div>
-      {/* Overlay message until the game is started */}
-      {!gameStarted && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <div className="text-white text-2xl bg-black/50 p-4 rounded">
-            {currentPlayer.isAdmin
-              ? "Waiting to start the game..."
-              : "Waiting for the admin to start the game..."}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
