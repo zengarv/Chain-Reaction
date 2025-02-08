@@ -12,6 +12,9 @@ const LandingPage: React.FC = () => {
   const createRoom = () => {
     if (!username.trim()) return;
     const roomId = nanoid(10);
+    // Persist admin status and player name so they aren’t lost on refresh
+    localStorage.setItem("playerName", username);
+    localStorage.setItem("isAdmin", "true");
     navigate(`/room/${roomId}`, {
       state: { 
         isAdmin: true, 
@@ -20,6 +23,7 @@ const LandingPage: React.FC = () => {
       }
     });
   };
+  
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },

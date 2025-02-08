@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import GameBoard from './GameBoard';
 import PlayersList from './PlayersList';
@@ -8,16 +8,17 @@ import { Cell, GameSettings, Message, Player } from '../types/game';
 import { GameLogic } from './GameLogic';
 import { RoomHeader } from './RoomHeader';
 import GameOver from './GameOver';
+import socket from '../socket';
 
-const PLAYER_COLORS = {
-  player1: '#FF4C3C', // Bright Red
-  player2: '#2EFF31', // Vivid Green
-  player3: '#3498FF', // Bright Blue
-  player4: '#F1C40F', // Golden Yellow
-  player5: '#9B59B6', // Deep Purple
-  player6: '#E67E22', // Bright Orange
-  player7: '#01F9C6', // Teal
-  player8: '#F0FEFB', // White
+const PLAYER_COLORS: Record<string, string> = {
+  player1: '#FF4C3C', 
+  player2: '#2EFF31',
+  player3: '#3498FF',
+  player4: '#F1C40F',
+  player5: '#9B59B6',
+  player6: '#E67E22',
+  player7: '#01F9C6',
+  player8: '#F0FEFB',
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -27,50 +28,117 @@ const DEFAULT_SETTINGS: GameSettings = {
 const GameRoom: React.FC = () => {
   const { roomId } = useParams();
   const location = useLocation();
-  const [gameLogic, setGameLogic] = useState<GameLogic | null>(null);
-  const [board, setBoard] = useState<Cell[][]>([]);
-  const [players, setPlayers] = useState<Player[]>([]);
+  const navigate = useNavigate();
+
+  // Use sessionStorage so that each browser tab gets its own player name and admin status.
+  const storedPlayerName = sessionStorage.getItem("playerName");
+  const storedIsAdmin = sessionStorage.getItem("isAdmin") === "true";
+
+  // Use location.state if available; otherwise, fall back to sessionStorage.
+  const initialPlayerName = location.state?.playerName || storedPlayerName;
+  const isAdmin = (location.state?.isAdmin !== undefined)
+    ? location.state.isAdmin
+    : storedIsAdmin;
+
+  useEffect(() => {
+    if (!initialPlayerName) {
+      navigate(`/join/${roomId}`);
+    }
+  }, [initialPlayerName, navigate, roomId]);
+
+  if (!initialPlayerName) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
+        Redirecting...
+      </div>
+    );
+  }
+
+  // Create a default player object based on the provided name and admin flag.
+  const defaultPlayer: Player = {
+    id: initialPlayerName,
+    name: initialPlayerName,
+    color: PLAYER_COLORS.player1,
+    isAdmin: isAdmin,
+    isActive: true,
+  };
+
+  // Initialize state synchronously so that gameLogic and currentPlayer are never null.
+  const [gameLogic, setGameLogic] = useState<GameLogic>(
+    new GameLogic(DEFAULT_SETTINGS.boardSize.rows, DEFAULT_SETTINGS.boardSize.cols, [defaultPlayer])
+  );
+  const [board, setBoard] = useState<Cell[][]>(gameLogic.getBoard());
+  const [players, setPlayers] = useState<Player[]>([defaultPlayer]);
   const [isExploding, setIsExploding] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
+  const [currentPlayer, setCurrentPlayer] = useState<Player>(defaultPlayer);
   const [winner, setWinner] = useState<Player | null>(null);
   const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(null);
+
+  // Connect via Socket.IO.
+  useEffect(() => {
+    socket.emit("joinRoom", { roomId, playerName: initialPlayerName, isAdmin });
+  
+    const handlePlayerListUpdate = (updatedPlayers: Player[]) => setPlayers(updatedPlayers);
+    const handleChatMessage = (msg: Message) => setMessages(prev => [...prev, msg]);
+  
+    socket.on("playerListUpdate", handlePlayerListUpdate);
+    socket.on("chatMessage", handleChatMessage);
+  
+    return () => {
+      socket.off("playerListUpdate", handlePlayerListUpdate);
+      socket.off("chatMessage", handleChatMessage);
+    };
+  }, [roomId, initialPlayerName, isAdmin]);
+
+  // For the admin: reinitialize the game logic (using settings from location.state if available).
+  useEffect(() => {
+    if (isAdmin) {
+      const settings = location.state?.settings || DEFAULT_SETTINGS;
+      const adminPlayer: Player = {
+        id: initialPlayerName,
+        name: initialPlayerName,
+        color: PLAYER_COLORS.player1,
+        isAdmin: true,
+        isActive: true,
+      };
+      const newGameLogic = new GameLogic(settings.boardSize.rows, settings.boardSize.cols, [adminPlayer]);
+      setGameLogic(newGameLogic);
+      setBoard(newGameLogic.getBoard());
+      setCurrentPlayer(adminPlayer);
+      setPlayers([adminPlayer]);
+    }
+  }, [isAdmin, initialPlayerName, location.state]);
+
+  // For non-admins: initialize a default game state (so the board is visible) and listen for gameStart.
+  useEffect(() => {
+    if (!isAdmin) {
+      socket.on("gameStart", (data: { players: Player[]; board: Cell[][]; settings: GameSettings }) => {
+        const newGameLogic = new GameLogic(
+          data.settings.boardSize.rows,
+          data.settings.boardSize.cols,
+          data.players,
+          data.board
+        );
+        setGameLogic(newGameLogic);
+        setBoard(newGameLogic.getBoard());
+        setPlayers(data.players);
+        setCurrentPlayer(newGameLogic.getCurrentPlayer());
+        setGameStarted(true);
+      });
+    }
+    return () => {
+      socket.off("gameStart");
+    };
+  }, [isAdmin]);
 
   const updateBoard = useCallback((newBoard: Cell[][]) => {
     setBoard([...newBoard]);
   }, []);
 
-  useEffect(() => {
-    const settings = location.state?.settings || DEFAULT_SETTINGS;
-    
-    const initialPlayers = [{
-      id: 'player1',
-      name: location.state?.playerName || 'Player 1',
-      color: PLAYER_COLORS.player1,
-      isAdmin: true,
-      isActive: true
-    }];
-
-    setPlayers(initialPlayers);
-    initializeGame(initialPlayers, settings);
-  }, [location.state]);
-
-  const initializeGame = (gamePlayers: Player[], settings: GameSettings) => {
-    const newGameLogic = new GameLogic(
-      settings.boardSize.rows,
-      settings.boardSize.cols,
-      gamePlayers
-    );
-
-    setGameLogic(newGameLogic);
-    setBoard(newGameLogic.getBoard());
-    setCurrentPlayer(newGameLogic.getCurrentPlayer());
-  };
-
   const handleCellClick = async (row: number, col: number) => {
-    if (!gameLogic || !currentPlayer || isExploding || !gameStarted) return;
-  
+    if (!gameLogic || !currentPlayer || isExploding) return;
     if (!gameLogic.isValidMove(row, col, currentPlayer.id)) return;
   
     setLastMove({ row, col });
@@ -82,7 +150,7 @@ const GameRoom: React.FC = () => {
       await gameLogic.handleExplosions(updateBoard, 200);
       gameLogic.updatePlayerStatus();
       
-      setPlayers(prevPlayers => 
+      setPlayers(prevPlayers =>
         prevPlayers.map(player => ({
           ...player,
           isActive: gameLogic.getActivePlayers().some(p => p.id === player.id)
@@ -104,30 +172,34 @@ const GameRoom: React.FC = () => {
       gameLogic.getNextPlayer();
       setCurrentPlayer(gameLogic.getCurrentPlayer());
     }
-  };  
+  };
 
   const handleStartGame = () => {
     if (players.length >= 2) {
-      setGameStarted(true);
       const settings = location.state?.settings || DEFAULT_SETTINGS;
-      initializeGame(players, settings);
+      // Emit gameStart so non-admins update their game state.
+      socket.emit("gameStart", {
+        roomId,
+        players,
+        settings,
+        board: new GameLogic(settings.boardSize.rows, settings.boardSize.cols, players).getBoard(),
+      });
+      // Reinitialize game logic for the admin.
+      const newGameLogic = new GameLogic(settings.boardSize.rows, settings.boardSize.cols, players);
+      setGameLogic(newGameLogic);
+      setBoard(newGameLogic.getBoard());
+      setCurrentPlayer(newGameLogic.getCurrentPlayer());
+      setGameStarted(true);
     }
   };
 
   const handlePlayAgain = () => {
     const settings = location.state?.settings || DEFAULT_SETTINGS;
-    
     const initialPlayers = players.map(player => ({
       ...player,
       isActive: true
     }));
-  
-    const newGameLogic = new GameLogic(
-      settings.boardSize.rows,
-      settings.boardSize.cols,
-      initialPlayers
-    );
-  
+    const newGameLogic = new GameLogic(settings.boardSize.rows, settings.boardSize.cols, initialPlayers);
     setGameLogic(newGameLogic);
     setBoard(newGameLogic.getBoard());
     setPlayers(initialPlayers);
@@ -141,90 +213,84 @@ const GameRoom: React.FC = () => {
 
   const handleSendMessage = (text: string) => {
     if (!gameLogic || !currentPlayer) return;
-    
     const newMessage: Message = {
       id: Date.now().toString(),
       playerId: currentPlayer.id,
       text,
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, newMessage]);
+    setMessages(prev => [...prev, newMessage]);
   };
 
-  if (!gameLogic || !currentPlayer) {
-    return (
-      <div className="min-h-screen bg-gray-900 p-4 flex flex-col items-center justify-center">
-        <div className="text-white text-xl">Loading game board...</div>
-      </div>
-    );
-  }
-
   return (
-    <motion.div 
-      className="min-h-screen bg-gray-900 p-3 lg:p-4 relative"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-    >
-      <motion.div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
-        <motion.div className="lg:col-span-3 relative">
-          <RoomHeader 
-            roomId={roomId || ''} 
-            playerCount={players.length}
-            currentPlayer={currentPlayer}
-            showStartButton={!gameStarted && currentPlayer.isAdmin && players.length >= 2}
-            onStartGame={handleStartGame}
-          />
-          
-          <motion.div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">
-            <GameBoard
-              board={board}
+    <div className="min-h-screen bg-gray-900 relative">
+      {/* Main UI is always rendered */}
+      <motion.div className="p-3 lg:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
+          <div className="lg:col-span-3 relative">
+            <RoomHeader 
+              roomId={roomId || ''} 
+              playerCount={players.length}
               currentPlayer={currentPlayer}
-              onCellClick={handleCellClick}
-              playerColors={PLAYER_COLORS}
-              lastMove={lastMove}
+              showStartButton={!gameStarted && currentPlayer.isAdmin && players.length >= 2}
+              onStartGame={handleStartGame}
             />
-            {winner && (
-              <GameOver
-                winner={{
-                  name: winner.name,
-                  color: winner.color
-                }}
-                onPlayAgain={handlePlayAgain}
-                onShufflePlayers={() => {}}
+            <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">
+              <GameBoard
+                board={board}
+                currentPlayer={currentPlayer}
+                onCellClick={handleCellClick}
+                playerColors={PLAYER_COLORS}
+                lastMove={lastMove}
               />
+              {winner && (
+                <GameOver
+                  winner={{ name: winner.name, color: winner.color }}
+                  onPlayAgain={handlePlayAgain}
+                  onShufflePlayers={() => {}}
+                />
+              )}
+            </div>
+          </div>
+          <div className="space-y-3 lg:space-y-4">
+            <PlayersList
+              players={players}
+              currentPlayer={currentPlayer.id}
+              gameStarted={gameStarted}
+            />
+            <ChatWindow
+              messages={messages}
+              playerColors={PLAYER_COLORS}
+              players={players}
+              roomId={roomId || ''}
+              currentPlayerName={initialPlayerName}
+            />
+            {!gameStarted && currentPlayer.isAdmin && (
+              <motion.button
+                className="hidden lg:block w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
+                           hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleStartGame}
+                disabled={players.length < 2}
+              >
+                Start Game ({players.length}/{players.length} Players)
+              </motion.button>
             )}
-          </motion.div>
-        </motion.div>
-        
-        <motion.div className="space-y-3 lg:space-y-4">
-          <PlayersList
-            players={players}
-            currentPlayer={currentPlayer.id}
-            gameStarted={gameStarted}
-          />
-          
-          <ChatWindow
-            messages={messages}
-            playerColors={PLAYER_COLORS}
-            onSendMessage={handleSendMessage}
-            players={players}
-          />
-          
-          {!gameStarted && currentPlayer.isAdmin && (
-            <motion.button
-              className="hidden lg:block w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
-                       hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleStartGame}
-              disabled={players.length < 2}
-            >
-              Start Game ({players.length}/{players.length} Players)
-            </motion.button>
-          )}
-        </motion.div>
-      </motion.div>     
-    </motion.div>
+          </div>
+        </div>
+      </motion.div>
+      {/* Overlay message until the game is started */}
+      {!gameStarted && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div className="text-white text-2xl bg-black/50 p-4 rounded">
+            {currentPlayer.isAdmin
+              ? "Waiting to start the game..."
+              : "Waiting for the admin to start the game..."}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

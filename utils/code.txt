@@ -1,0 +1,1473 @@
+===== App.tsx =====
+// App.tsx
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import LandingPage from './components/LandingPage';
+import JoinRoom from './components/JoinRoom';
+import GameRoom from './components/GameRoom';
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/join/:roomId" element={<JoinRoom />} />
+        <Route path="/room/:roomId" element={<GameRoom />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
+
+
+===== index.css =====
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+===== main.tsx =====
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+
+
+===== socket.ts =====
+// socket.ts
+import { io, Socket } from "socket.io-client";
+
+// Make sure the URL/port matches your server.
+const socket: Socket = io("http://localhost:3001");
+
+export default socket;
+
+
+===== vite-env.d.ts =====
+/// <reference types="vite/client" />
+
+
+===== components\Cell.tsx =====
+import React, { useRef, useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import Orb from './Orb';
+
+interface CellProps {
+  rowIndex: number;
+  colIndex: number;
+  cell: {
+    orbs: number;
+    playerId: string | null;
+  };
+  criticalMass: number;
+  playerColors: Record<string, string>;
+  onCellClick: (row: number, col: number) => void;
+  currentPlayer: string;
+  isLastMove: boolean;
+}
+
+const Cell: React.FC<CellProps> = ({
+  rowIndex,
+  colIndex,
+  cell,
+  criticalMass,
+  playerColors,
+  onCellClick,
+  currentPlayer,
+  isLastMove,
+}) => {
+  const cellRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState({ width: 0, height: 0 });
+  const isUnstable = cell.orbs === criticalMass - 1;
+
+  useEffect(() => {
+    const updateCellSize = () => {
+      if (cellRef.current) {
+        const { width, height } = cellRef.current.getBoundingClientRect();
+        setCellSize({ width, height });
+      }
+    };
+
+    updateCellSize();
+    const resizeObserver = new ResizeObserver(updateCellSize);
+    
+    if (cellRef.current) {
+      resizeObserver.observe(cellRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const cellVariants = {
+    initial: {
+      scale: 1,
+      rotate: 0,
+    },
+    explode: {
+      scale: [1, 1.1, 0.9, 1], // Reduced scale for smaller cells
+      rotate: [0, 5, -5, 0], // Reduced rotation for smaller cells
+      transition: {
+        duration: 0.4,
+        ease: "easeInOut",
+        times: [0, 0.2, 0.5, 1],
+      }
+    }
+  };
+
+  return (
+    <motion.div
+      ref={cellRef}
+      key={`${rowIndex}-${colIndex}`}
+      className="aspect-square border-2 border-transparent rounded-lg bg-gray-800/50 
+                 backdrop-blur-sm hover:bg-gray-700/50 cursor-pointer overflow-hidden
+                 transition-colors duration-200"
+      style={{
+        borderColor: isLastMove ? playerColors[cell.playerId!] : 'transparent',
+      }}
+      initial="initial"
+      variants={cellVariants}
+      animate={cell.orbs >= criticalMass ? "explode" : "initial"}
+      whileHover={{ 
+        scale: 1.02, // Reduced hover scale
+        borderColor: playerColors[currentPlayer],
+      }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => onCellClick(rowIndex, colIndex)}
+      layout
+    >
+      <AnimatePresence mode="wait">
+        {cell.orbs > 0 && (
+          <motion.div
+            key={`orb-${cell.orbs}-${cell.playerId}`}
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ 
+              scale: 1.2, // Reduced exit scale
+              opacity: 0,
+              transition: { 
+                duration: 0.2,
+                ease: "easeOut"
+              }
+            }}
+            className="w-full h-full flex items-center justify-center"
+          >
+            <Orb
+              color={playerColors[cell.playerId!]}
+              count={cell.orbs}
+              isUnstable={isUnstable}
+              cellSize={Math.min(cellSize.width, cellSize.height)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+export default Cell;
+
+
+===== components\ChatWindow.tsx =====
+// ChatWindow.tsx
+import React, { useState } from 'react';
+import { MessageCircle, Send } from 'lucide-react';
+import { Message, Player } from '../types/game';
+import { motion } from 'framer-motion';
+import socket from '../socket';
+
+interface ChatWindowProps {
+  messages: Message[];
+  playerColors: Record<string, string>;
+  players: Player[];
+  roomId: string;          
+  currentPlayerName: string; 
+}
+
+const ChatWindow: React.FC<ChatWindowProps> = ({
+  messages,
+  playerColors,
+  players,
+  roomId,  
+  currentPlayerName, 
+}) => {
+  const [newMessage, setNewMessage] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newMessage.trim()) {
+      // Emit a chat message with the room ID and current player's name.
+      socket.emit('sendChatMessage', {
+        roomId,
+        message: newMessage,
+        playerName: currentPlayerName,
+      });
+      setNewMessage('');
+    }
+  };
+
+  // Returns the player name given a player ID.
+  const getPlayerName = (playerId: string) => {
+    const player = players.find(p => p.id === playerId);
+    return player ? player.name : playerId;
+  };
+
+  return (
+    <motion.div 
+      className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 h-[300px] flex flex-col"
+      whileHover={{ scale: 1.01 }}
+      transition={{ type: "spring", stiffness: 300 }}
+    >
+      <motion.div 
+        className="flex items-center space-x-2 mb-4"
+        whileHover={{ x: 5 }}
+      >
+        <motion.div
+          whileHover={{ rotate: 15, scale: 1.1 }}
+          transition={{ type: "spring", stiffness: 400 }}
+        >
+          <MessageCircle className="w-5 h-5 text-purple-400" />
+        </motion.div>
+        <h2 className="text-lg font-semibold text-white">Chat</h2>
+      </motion.div>
+      
+      <div className="flex-1 overflow-y-auto mb-4 space-y-2">
+        {messages.map((msg) => (
+          <motion.div 
+            key={msg.id} 
+            className="text-sm"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            whileHover={{ scale: 1.02, x: 5 }}
+          >
+            <span className="font-medium" style={{ color: playerColors[msg.playerId] }}>
+              {getPlayerName(msg.playerId)}:
+            </span>{' '}
+            <span className="text-white">{msg.text}</span>
+          </motion.div>
+        ))}
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex space-x-2">
+        <motion.input
+          type="text"
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          className="flex-1 bg-gray-700 text-white rounded px-3 py-2 text-sm"
+          placeholder="Type a message..."
+          whileFocus={{ scale: 1.02 }}
+          transition={{ type: "spring", stiffness: 300 }}
+        />
+        <motion.button
+          type="submit"
+          className="bg-gray-700 p-2 rounded hover:bg-gray-600 transition-colors"
+          whileHover={{ scale: 1.2, rotate: 5 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <motion.div
+            whileTap={{ translateX: 2, translateY: -2, scale: 1.1 }}
+            transition={{ type: "spring", stiffness: 400 }}
+          >
+            <Send className="w-4 h-4 text-white" />
+          </motion.div>
+        </motion.button>
+      </form>
+    </motion.div>
+  );
+};
+
+export default ChatWindow;
+
+
+===== components\GameBoard.tsx =====
+import React from 'react';
+import { Cell as CellType, Player} from '../types/game';
+import Cell from './Cell';
+
+interface GameBoardProps {
+  board: CellType[][];
+  onCellClick: (row: number, col: number) => void;
+  currentPlayer: Player;
+  playerColors: Record<string, string>;
+  lastMove: { row: number; col: number } | null;
+}
+
+const GameBoard: React.FC<GameBoardProps> = ({
+  board,
+  currentPlayer,
+  onCellClick,
+  playerColors,
+  lastMove,
+}) => {
+  const getCriticalMass = (row: number, col: number): number => {
+    const isCorner = (row === 0 || row === board.length - 1) && 
+                    (col === 0 || col === board[0].length - 1);
+    const isEdge = row === 0 || col === 0 || 
+                   row === board.length - 1 || col === board[0].length - 1;
+    return isCorner ? 2 : isEdge ? 3 : 4;
+  };
+
+  return (
+    <div 
+      className="grid gap-1"
+      style={{
+        gridTemplateColumns: `repeat(${board[0].length}, minmax(0, 1fr))`,
+      }}
+    >
+      {board.map((row, rowIndex) =>
+        row.map((cell, colIndex) => (
+          <Cell
+            key={`${rowIndex}-${colIndex}`}
+            rowIndex={rowIndex}
+            colIndex={colIndex}
+            cell={cell}
+            criticalMass={getCriticalMass(rowIndex, colIndex)}
+            playerColors={playerColors}
+            onCellClick={onCellClick}
+            currentPlayer={currentPlayer.id}
+            isLastMove={lastMove?.row === rowIndex && lastMove?.col === colIndex}
+          />
+        ))
+      )}
+    </div>
+  );
+};
+
+export default GameBoard;
+
+===== components\GameLogic.ts =====
+import { Cell, Player} from '../types/game';
+  
+export class GameLogic {
+  private board: Cell[][];
+  private rows: number;
+  private cols: number;
+  private players: Player[];
+  private currentPlayerIndex: number;
+  private maxExplosionIterations: number;
+
+  constructor(rows: number, cols: number, players: Player[], initialBoard?: Cell[][]) {
+    this.rows = rows;
+    this.cols = cols;
+    this.players = [...players];
+    this.currentPlayerIndex = 0;
+    this.board = this.createEmptyBoard(); // Always create a fresh board on construction
+    this.maxExplosionIterations = rows * cols * 2;
+  }
+
+  // Add a new method to explicitly reset the game state
+  public resetGame(players: Player[]): void {
+    this.board = this.createEmptyBoard();
+    this.players = [...players];
+    this.currentPlayerIndex = 0;
+  }
+
+
+  
+  public addOrb(row: number, col: number): boolean {
+    const currentPlayer = this.getCurrentPlayer();
+    if (!this.isValidMove(row, col, currentPlayer.id)) return false;
+
+    const newBoard = this.board.map(r => r.map(c => ({...c})));
+    const cell = newBoard[row][col];
+    const criticalMass = this.getCriticalMass(row, col);
+    
+    newBoard[row][col] = {
+      orbs: cell.orbs + 1,
+      playerId: currentPlayer.id
+    };
+
+    this.board = newBoard;
+    return this.board[row][col].orbs >= criticalMass;
+  }
+
+  public handleExplosions(
+    onExplode: (board: Cell[][]) => void,
+    delay: number
+  ): Promise<boolean> {
+    return new Promise(async (resolve) => {
+      let hasExploded = false;
+      let explosionOccurred = true;
+      let iterationCount = 0;
+      let previousBoardStates = new Set<string>();
+      
+      while (explosionOccurred && iterationCount < this.maxExplosionIterations) {
+        explosionOccurred = false;
+        const newBoard = this.board.map(row => row.map(cell => ({...cell})));
+        
+        // Create a string representation of the current board state
+        const currentBoardState = this.getBoardStateString(newBoard);
+        
+        // Check if we've seen this board state before
+        if (previousBoardStates.has(currentBoardState)) {
+          // Force end game if we detect a loop
+          this.handlePerpetualExplosion();
+          resolve(true);
+          return;
+        }
+        
+        previousBoardStates.add(currentBoardState);
+
+        for (let row = 0; row < this.rows; row++) {
+          for (let col = 0; col < this.cols; col++) {
+            const cell = newBoard[row][col];
+            if (cell.orbs >= this.getCriticalMass(row, col)) {
+              this.explodeCell(newBoard, row, col);
+              explosionOccurred = true;
+              hasExploded = true;
+            }
+          }
+        }
+
+        if (explosionOccurred) {
+          this.board = newBoard;
+          onExplode(this.board);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          iterationCount++;
+        }
+      }
+      
+      // If we've hit the maximum iterations, handle it as a special case
+      if (iterationCount >= this.maxExplosionIterations) {
+        this.handlePerpetualExplosion();
+      }
+
+      resolve(hasExploded);
+    });
+  }
+
+  private getBoardStateString(board: Cell[][]): string {
+    return board.map(row => 
+      row.map(cell => 
+        `${cell.orbs}-${cell.playerId || 'empty'}`
+      ).join('|')
+    ).join('_');
+  }
+  
+  private handlePerpetualExplosion(): void {
+    // Find the player with the most orbs
+    const orbCounts = new Map<string, number>();
+    
+    for (let row = 0; row < this.rows; row++) {
+      for (let col = 0; col < this.cols; col++) {
+        const cell = this.board[row][col];
+        if (cell.playerId) {
+          orbCounts.set(
+            cell.playerId, 
+            (orbCounts.get(cell.playerId) || 0) + cell.orbs
+          );
+        }
+      }
+    }
+    
+    // Determine winner based on orb count
+    let maxOrbs = 0;
+    let winningPlayerId: string | null = null;
+    
+    orbCounts.forEach((count, playerId) => {
+      if (count > maxOrbs) {
+        maxOrbs = count;
+        winningPlayerId = playerId;
+      }
+    });
+    
+    // Set all cells to the winning player
+    if (winningPlayerId) {
+      this.board = this.board.map(row =>
+        row.map(cell => ({
+          orbs: 1,
+          playerId: winningPlayerId
+        }))
+      );
+    }
+    
+    // Deactivate all other players
+    this.players = this.players.map(player => ({
+      ...player,
+      isActive: player.id === winningPlayerId
+    }));
+  }
+
+  private createEmptyBoard(): Cell[][] {
+    // Ensure each cell is properly initialized with null values
+    return Array(this.rows).fill(null).map(() =>
+      Array(this.cols).fill(null).map(() => ({ 
+        orbs: 0, 
+        playerId: null 
+      }))
+    );
+  }
+
+  private getCriticalMass(row: number, col: number): number {
+    const isCorner = (row === 0 || row === this.rows - 1) && 
+                    (col === 0 || col === this.cols - 1);
+    const isEdge = row === 0 || col === 0 || 
+                   row === this.rows - 1 || col === this.cols - 1;
+    return isCorner ? 2 : isEdge ? 3 : 4;
+  }
+
+  private getAdjacentCells(row: number, col: number): [number, number][] {
+    const adjacent: [number, number][] = [];
+    if (row > 0) adjacent.push([row - 1, col]);
+    if (row < this.rows - 1) adjacent.push([row + 1, col]);
+    if (col > 0) adjacent.push([row, col - 1]);
+    if (col < this.cols - 1) adjacent.push([row, col + 1]);
+    return adjacent;
+  }
+    
+  public isValidMove(row: number, col: number, playerId: string): boolean {
+    if (!this.players[this.currentPlayerIndex].isActive) {
+      return false;
+    }
+    
+    if (this.players[this.currentPlayerIndex].id !== playerId) {
+      return false;
+    }
+
+    const cell = this.board[row][col];
+    // A move is valid if:
+    // 1. The cell is empty (no player owns it)
+    // 2. The current player owns the cell
+    return !cell.playerId || cell.playerId === playerId;
+  }
+
+  private explodeCell(board: Cell[][], row: number, col: number): void {
+    const criticalMass = this.getCriticalMass(row, col);
+    const currentPlayerId = board[row][col].playerId;
+    
+    board[row][col] = {
+      orbs: board[row][col].orbs - criticalMass,
+      playerId: board[row][col].orbs - criticalMass > 0 ? currentPlayerId : null
+    };
+
+    const adjacent = this.getAdjacentCells(row, col);
+    for (const [adjRow, adjCol] of adjacent) {
+      board[adjRow][adjCol] = {
+        orbs: board[adjRow][adjCol].orbs + 1,
+        playerId: currentPlayerId
+      };
+    }
+  }
+
+  public getCurrentPlayer(): Player {
+    return this.players[this.currentPlayerIndex];
+  }
+
+  public getNextPlayer(): void {
+    let nextIndex = (this.currentPlayerIndex + 1) % this.players.length;
+    let loopCount = 0;
+    
+    // Keep looking for the next active player
+    while (!this.players[nextIndex].isActive && loopCount < this.players.length) {
+      nextIndex = (nextIndex + 1) % this.players.length;
+      loopCount++;
+    }
+    
+    // If we've gone through all players and found none active, stay on current player
+    if (loopCount < this.players.length) {
+      this.currentPlayerIndex = nextIndex;
+    }
+  }
+
+  public getBoard(): Cell[][] {
+    return this.board;
+  }
+
+  public updatePlayerStatus(): void {
+    const activePlayers = this.players.filter(player => 
+      this.board.some(row => row.some(cell => cell.playerId === player.id))
+    );
+    
+    this.players = this.players.map(player => ({
+      ...player,
+      isActive: activePlayers.some(p => p.id === player.id)
+    }));
+
+    // If current player is not active, move to next active player
+    if (!this.players[this.currentPlayerIndex].isActive) {
+      this.getNextPlayer();
+    }
+  }
+
+  private isPlayerEliminated(playerId: string): boolean {
+    return !this.board.some(row => 
+      row.some(cell => cell.playerId === playerId)
+    );
+  }
+
+  public getActivePlayers(): Player[] {
+    return this.players.filter(player => player.isActive);
+  }
+
+  public getPlayerById(id: string): Player | undefined {
+    return this.players.find(player => player.id === id);
+  }
+}
+
+===== components\GameOver.tsx =====
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Trophy } from 'lucide-react';
+
+interface GameOverProps {
+  winner: {
+    name: string;
+    color: string;
+  };
+  onPlayAgain: () => void;
+  onShufflePlayers: () => void;
+}
+
+const GameOver: React.FC<GameOverProps> = ({ winner, onPlayAgain, onShufflePlayers }) => {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center p-4 z-50">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-gray-800/90 rounded-xl p-6 max-w-md w-full text-center relative"
+      >
+        <motion.div
+          initial={{ rotate: -10, scale: 0.9 }}
+          animate={{ rotate: 0, scale: 1 }}
+          transition={{ type: "spring", bounce: 0.5 }}
+          className="inline-block mb-4"
+        >
+          <Trophy size={48} style={{ color: winner.color }} />
+        </motion.div>
+        
+        <motion.h2 
+          className="text-2xl font-bold mb-2"
+          style={{ color: winner.color }}
+        >
+          {winner.name} Won!
+        </motion.h2>
+        
+        <p className="text-gray-300 mb-6">
+          {winner.name} has conquered the board!
+        </p>
+        
+        <div className="space-y-3">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="bg-purple-600 text-white py-3 px-6 rounded-lg font-medium 
+                     hover:bg-purple-700 transition-colors w-full"
+            onClick={onPlayAgain}
+          >
+            Play Again
+          </motion.button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default GameOver;
+
+===== components\GameRoom.tsx =====
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import GameBoard from './GameBoard';
+import PlayersList from './PlayersList';
+import ChatWindow from './ChatWindow';
+import { Cell, GameSettings, Message, Player } from '../types/game';
+import { GameLogic } from './GameLogic';
+import { RoomHeader } from './RoomHeader';
+import GameOver from './GameOver';
+import socket from '../socket';
+
+const PLAYER_COLORS: Record<string, string> = {
+  player1: '#FF4C3C', 
+  player2: '#2EFF31',
+  player3: '#3498FF',
+  player4: '#F1C40F',
+  player5: '#9B59B6',
+  player6: '#E67E22',
+  player7: '#01F9C6',
+  player8: '#F0FEFB',
+};
+
+const DEFAULT_SETTINGS: GameSettings = {
+  boardSize: { rows: 9, cols: 6 }
+};
+
+const GameRoom: React.FC = () => {
+  const { roomId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Check for a playerName; if missing, redirect to join screen.
+  const initialPlayerName = location.state?.playerName;
+  if (!initialPlayerName) {
+    // Redirect to the JoinRoom page if no name was provided.
+    navigate(`/join/${roomId}`);
+    return null;
+  }
+
+  // State declarations.
+  const [gameLogic, setGameLogic] = useState<GameLogic | null>(null);
+  const [board, setBoard] = useState<Cell[][]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [isExploding, setIsExploding] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
+  const [winner, setWinner] = useState<Player | null>(null);
+  const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(null);
+
+  // This useEffect is for joining the room via Socket.IO.
+  useEffect(() => {
+    socket.emit('joinRoom', {
+      roomId,
+      playerName: initialPlayerName,
+      isAdmin: location.state?.isAdmin || false,
+    });
+
+    socket.on('playerListUpdate', (updatedPlayers: Player[]) => {
+      setPlayers(updatedPlayers);
+    });
+
+    socket.on('chatMessage', (msg: Message) => {
+      setMessages((prev) => [...prev, msg]);
+    });
+
+    return () => {
+      socket.off('playerListUpdate');
+      socket.off('chatMessage');
+    };
+  }, [roomId, initialPlayerName, location.state]);
+
+  // For the admin, initialize the game state immediately.
+  useEffect(() => {
+    if (location.state?.isAdmin) {
+      const settings = location.state?.settings || DEFAULT_SETTINGS;
+      const initialPlayers: Player[] = [{
+        id: 'player1', // Temporary ID until replaced by socket.id if needed.
+        name: initialPlayerName,
+        color: PLAYER_COLORS.player1,
+        isAdmin: true,
+        isActive: true
+      }];
+      setPlayers(initialPlayers);
+      initializeGame(initialPlayers, settings);
+    }
+  }, [location.state, initialPlayerName]);
+
+  const initializeGame = (gamePlayers: Player[], settings: GameSettings) => {
+    const newGameLogic = new GameLogic(
+      settings.boardSize.rows,
+      settings.boardSize.cols,
+      gamePlayers
+    );
+    setGameLogic(newGameLogic);
+    setBoard(newGameLogic.getBoard());
+    setCurrentPlayer(newGameLogic.getCurrentPlayer());
+  };
+
+  const updateBoard = useCallback((newBoard: Cell[][]) => {
+    setBoard([...newBoard]);
+  }, []);
+
+  const handleCellClick = async (row: number, col: number) => {
+    if (!gameLogic || !currentPlayer || isExploding || !gameStarted) return;
+  
+    if (!gameLogic.isValidMove(row, col, currentPlayer.id)) return;
+  
+    setLastMove({ row, col });
+    const willExplode = gameLogic.addOrb(row, col);
+    updateBoard(gameLogic.getBoard());
+  
+    if (willExplode) {
+      setIsExploding(true);
+      await gameLogic.handleExplosions(updateBoard, 200);
+      gameLogic.updatePlayerStatus();
+      
+      setPlayers(prevPlayers => 
+        prevPlayers.map(player => ({
+          ...player,
+          isActive: gameLogic.getActivePlayers().some(p => p.id === player.id)
+        }))
+      );
+      
+      const activePlayers = gameLogic.getActivePlayers();
+      if (activePlayers.length <= 1) {
+        setGameStarted(false);
+        const winningPlayer = players.find(p => p.id === (activePlayers[0]?.id || currentPlayer.id));
+        setWinner(winningPlayer || currentPlayer);
+      } else {
+        gameLogic.getNextPlayer();
+        setCurrentPlayer(gameLogic.getCurrentPlayer());
+      }
+      
+      setIsExploding(false);
+    } else {
+      gameLogic.getNextPlayer();
+      setCurrentPlayer(gameLogic.getCurrentPlayer());
+    }
+  };  
+
+  const handleStartGame = () => {
+    if (players.length >= 2) {
+      setGameStarted(true);
+      const settings = location.state?.settings || DEFAULT_SETTINGS;
+      initializeGame(players, settings);
+    }
+  };
+
+  const handlePlayAgain = () => {
+    const settings = location.state?.settings || DEFAULT_SETTINGS;
+    
+    const initialPlayers = players.map(player => ({
+      ...player,
+      isActive: true
+    }));
+  
+    const newGameLogic = new GameLogic(
+      settings.boardSize.rows,
+      settings.boardSize.cols,
+      initialPlayers
+    );
+  
+    setGameLogic(newGameLogic);
+    setBoard(newGameLogic.getBoard());
+    setPlayers(initialPlayers);
+    setCurrentPlayer(newGameLogic.getCurrentPlayer());
+    setWinner(null);
+    setGameStarted(false);
+    setMessages([]);
+    setLastMove(null);
+    setIsExploding(false);
+  };
+
+  const handleSendMessage = (text: string) => {
+    if (!gameLogic || !currentPlayer) return;
+    
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      playerId: currentPlayer.id,
+      text,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, newMessage]);
+  };
+
+  if (!gameLogic || !currentPlayer) {
+    return (
+      <div className="min-h-screen bg-gray-900 p-4 flex flex-col items-center justify-center">
+        <div className="text-white text-xl">Loading game board...</div>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div 
+      className="min-h-screen bg-gray-900 p-3 lg:p-4 relative"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+    >
+      <motion.div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
+        <motion.div className="lg:col-span-3 relative">
+          <RoomHeader 
+            roomId={roomId || ''} 
+            playerCount={players.length}
+            currentPlayer={currentPlayer}
+            showStartButton={!gameStarted && currentPlayer.isAdmin && players.length >= 2}
+            onStartGame={handleStartGame}
+          />
+          
+          <motion.div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">
+            <GameBoard
+              board={board}
+              currentPlayer={currentPlayer}
+              onCellClick={handleCellClick}
+              playerColors={PLAYER_COLORS}
+              lastMove={lastMove}
+            />
+            {winner && (
+              <GameOver
+                winner={{
+                  name: winner.name,
+                  color: winner.color
+                }}
+                onPlayAgain={handlePlayAgain}
+                onShufflePlayers={() => {}}
+              />
+            )}
+          </motion.div>
+        </motion.div>
+        
+        <motion.div className="space-y-3 lg:space-y-4">
+          <PlayersList
+            players={players}
+            currentPlayer={currentPlayer.id}
+            gameStarted={gameStarted}
+          />
+          
+          <ChatWindow
+            messages={messages}
+            playerColors={PLAYER_COLORS}
+            players={players}
+            roomId={roomId || ''}
+            currentPlayerName={location.state?.playerName || ''}
+          />
+          
+          {!gameStarted && currentPlayer.isAdmin && (
+            <motion.button
+              className="hidden lg:block w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
+                       hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleStartGame}
+              disabled={players.length < 2}
+            >
+              Start Game ({players.length}/{players.length} Players)
+            </motion.button>
+          )}
+        </motion.div>
+      </motion.div>     
+    </motion.div>
+  );
+};
+
+export default GameRoom;
+
+===== components\JoinRoom.tsx =====
+// JoinRoom.tsx
+import React, { useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { User } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+const JoinRoom: React.FC = () => {
+  const navigate = useNavigate();
+  const { roomId } = useParams();
+  const [username, setUsername] = useState('');
+
+  const joinRoom = () => {
+    if (!username.trim()) return;
+    navigate(`/room/${roomId}`, {
+      state: {
+        isAdmin: false,
+        playerName: username,
+      },
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+      <motion.div 
+        className="max-w-md w-full p-8 bg-gray-800 rounded-xl shadow-2xl"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <motion.h1 
+          className="text-3xl font-bold mb-4 text-center"
+          initial={{ scale: 0.9 }}
+          animate={{ scale: 1 }}
+        >
+          Join Room
+        </motion.h1>
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+              <User className="w-4 h-4 text-purple-500" />
+              Username
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-700 rounded-lg"
+              placeholder="Enter your username"
+              required
+            />
+          </div>
+          <motion.button
+            onClick={joinRoom}
+            className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={!username.trim()}
+          >
+            Join Room
+          </motion.button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default JoinRoom;
+
+
+===== components\LandingPage.tsx =====
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Gamepad2, Grid, User } from 'lucide-react';
+import { nanoid } from 'nanoid';
+import { motion } from 'framer-motion';
+
+const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [boardSize, setBoardSize] = useState({ rows: 9, cols: 6 });
+  const [username, setUsername] = useState('');
+
+  const createRoom = () => {
+    if (!username.trim()) return;
+    const roomId = nanoid(10);
+    navigate(`/room/${roomId}`, {
+      state: { 
+        isAdmin: true, 
+        settings: { boardSize },
+        playerName: username
+      }
+    });
+  };
+
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { 
+        duration: 0.6,
+        staggerChildren: 0.1 
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, x: -20 },
+    visible: { opacity: 1, x: 0 }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+      <motion.div 
+        className="max-w-md w-full p-8 bg-gray-800 rounded-xl shadow-2xl"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div 
+          className="flex items-center justify-center mb-8"
+          variants={itemVariants}
+        >
+          <motion.div
+            whileHover={{ 
+              scale: 1.2,
+              rotate: 360,
+              transition: {
+                rotate: {
+                  duration: 1,
+                  ease: "linear"
+                },
+                scale: {
+                  duration: 0.2
+                }
+              }
+            }}
+          >
+            <Gamepad2 className="w-12 h-12 text-purple-500" />
+          </motion.div>
+          <motion.h1 
+            className="text-3xl font-bold ml-3"
+            whileHover={{ scale: 1.05 }}
+          >
+            Chain Reaction
+          </motion.h1>
+        </motion.div>
+
+        <div className="space-y-6">
+          <motion.div variants={itemVariants}>
+            <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+              <User className="w-4 h-4 text-purple-500" />
+              Username
+            </label>
+            <motion.input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-700 rounded-lg"
+              placeholder="Enter your username"
+              required
+              whileHover={{ scale: 1.02 }}
+            />
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+              <Grid className="w-4 h-4 text-purple-500" />
+              Board Size
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <motion.div whileHover={{ scale: 1.02 }}>
+                <input
+                  type="number"
+                  value={boardSize.rows}
+                  onChange={(e) => setBoardSize(prev => ({ ...prev, rows: parseInt(e.target.value) }))}
+                  className="w-full px-4 py-2 bg-gray-700 rounded-lg"
+                  min="4"
+                  max="12"
+                />
+                <span className="text-xs text-gray-400 mt-1">Rows</span>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.02 }}>
+                <input
+                  type="number"
+                  value={boardSize.cols}
+                  onChange={(e) => setBoardSize(prev => ({ ...prev, cols: parseInt(e.target.value) }))}
+                  className="w-full px-4 py-2 bg-gray-700 rounded-lg"
+                  min="4"
+                  max="12"
+                />
+                <span className="text-xs text-gray-400 mt-1">Columns</span>
+              </motion.div>
+            </div>
+          </motion.div>
+
+          <motion.button
+            onClick={createRoom}
+            className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium
+                     disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            variants={itemVariants}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            disabled={!username.trim()}
+          >
+            Create Room
+          </motion.button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default LandingPage;
+
+===== components\Orb.tsx =====
+import { motion } from 'framer-motion';
+import React, { useMemo } from 'react';
+
+interface OrbProps {
+  color: string;
+  count: number;
+  isUnstable: boolean;
+  cellSize: number;
+}
+
+const Orb: React.FC<OrbProps> = ({ color, count, isUnstable, cellSize }) => {
+  // More aggressive size reduction for smaller cells
+  const orbSize = useMemo(() => {
+    // Base size calculation
+    const baseSize = cellSize / 5; // Start with 20% of cell size
+    
+    // Progressive size reduction for smaller cells
+    let adjustedSize;
+    if (cellSize < 30) {
+      adjustedSize = baseSize * 0.6; // 60% of base size for very small cells
+    } else if (cellSize < 40) {
+      adjustedSize = baseSize * 0.75; // 75% of base size for small cells
+    } else {
+      adjustedSize = baseSize; // Full size for normal cells
+    }
+    
+    // Enforce min and max sizes
+    const finalSize = Math.max(4, Math.min(16, adjustedSize));
+    return Math.round(finalSize);
+  }, [cellSize]);
+
+  // Adjust orbit radius based on cell and orb size
+  const getOrbPositions = (index: number, total: number) => {
+    const maxRadius = (cellSize - orbSize) / 3; // Ensure orbs don't touch edges
+    const radius = total === 1 ? 0 : Math.min(maxRadius, maxRadius * 0.8);
+    const angle = (index * 2 * Math.PI) / total + Math.random() * 0.3;
+    return {
+      x: Math.cos(angle) * radius * (0.8 + Math.random() * 0.2),
+      y: Math.sin(angle) * radius * (0.8 + Math.random() * 0.2),
+    };
+  };
+
+  const orbVariants = {
+    idle: (i: number) => ({
+      x: getOrbPositions(i, count).x,
+      y: getOrbPositions(i, count).y,
+      scale: [1, 0.95 + Math.random() * 0.15, 1], // Reduced scale variation
+      transition: {
+        duration: 1.2 + Math.random() * 0.3,
+        repeat: Infinity,
+        repeatType: "reverse" as const,
+        delay: i * 0.1 * Math.random(),
+        ease: "easeInOut",
+      },
+    }),
+    unstable: (i: number) => ({
+      x: getOrbPositions(i, count).x + (Math.random() * cellSize * 0.03), // Reduced jitter
+      y: getOrbPositions(i, count).y + (Math.random() * cellSize * 0.03),
+      scale: [1, 1.1 + Math.random() * 0.1, 0.9 + Math.random() * 0.1, 1],
+      rotate: [0, 10 + Math.random() * 10, -10 - Math.random() * 10, 0],
+      transition: {
+        duration: 0.2 + Math.random() * 0.2,
+        repeat: Infinity,
+        repeatType: "reverse" as const,
+        ease: "easeInOut",
+        delay: i * 0.02 * Math.random(),
+      },
+    }),
+  };
+
+  // Adjust shadow size for smaller orbs
+  const shadowSize = Math.max(3, orbSize * 0.6); // Reduced shadow for smaller orbs
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      {Array.from({ length: count }).map((_, index) => (
+        <motion.div
+          key={index}
+          className="absolute"
+          style={{
+            width: `${orbSize}px`,
+            height: `${orbSize}px`,
+            backgroundColor: color,
+            borderRadius: '50%',
+            boxShadow: `0 0 ${shadowSize}px ${color}, 0 0 ${shadowSize * 1.5}px ${color}80`,
+          }}
+          variants={orbVariants}
+          animate={isUnstable ? 'unstable' : 'idle'}
+          custom={index}
+        />
+      ))}
+    </div>
+  );
+};
+
+export default Orb;
+
+===== components\PlayersList.tsx =====
+import React from 'react';
+import { Users } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Player } from '../types/game';
+
+interface PlayersListProps {
+  players: Player[];
+  currentPlayer: string;
+  gameStarted: boolean;
+}
+
+const PlayersList: React.FC<PlayersListProps> = ({ 
+  players, 
+  currentPlayer, 
+  gameStarted
+}) => {
+  const currentPlayerData = players.find(p => p.id === currentPlayer);
+
+  return (
+    <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4">
+      <div className="flex items-center justify-between mb-4">
+        <motion.div 
+          className="flex items-center space-x-2"
+          whileHover={{ x: 5 }}
+        >
+          <motion.div
+            whileHover={{ rotate: 15, scale: 1.1 }}
+            transition={{ type: "spring", stiffness: 400 }}
+          >
+            <Users className="w-5 h-5 text-purple-400" />
+          </motion.div>
+          <h2 className="text-lg font-semibold text-white">Players</h2>
+        </motion.div>
+        
+        <div className="flex items-center gap-2">
+          {gameStarted && currentPlayerData && (
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-700/50"
+              style={{ minWidth: '140px' }}
+            >
+              <div 
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: currentPlayerData.color }}
+              />
+              <span 
+                className="text-sm font-medium truncate"
+                style={{ color: currentPlayerData.color }}
+              >
+                {currentPlayerData.name}'s Turn
+              </span>
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      <motion.div className="space-y-2">
+        <AnimatePresence mode="popLayout">
+          {players.map((player) => (
+            <motion.div
+              key={player.id}
+              className={`flex items-center space-x-3 p-2 rounded-lg ${
+                player.id === currentPlayer ? 'bg-gray-700/50' : ''
+              }`}
+              layout
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ 
+                opacity: player.isActive ? 1 : 0.5,
+                scale: player.id === currentPlayer ? 1.02 : 1,
+                y: 0
+              }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+            >
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: player.color }}
+              />
+              
+              <span className="text-gray-300">{player.name}</span>
+              
+              {!player.isActive && gameStarted && (
+                <span className="text-xs text-red-400 ml-auto">Eliminated</span>
+              )}
+              {player.id === currentPlayer && gameStarted && (
+                <span className="text-xs text-green-400 ml-auto">Current Turn</span>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+};
+
+export default PlayersList;
+
+===== components\RoomHeader.tsx =====
+import React, { useState } from 'react';
+import { Home, Copy, Check } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Player } from '../types/game';
+import { useNavigate } from 'react-router-dom';
+
+interface RoomHeaderProps {
+  roomId: string;
+  playerCount: number;
+  currentPlayer: Player;
+  showStartButton: boolean;
+  onStartGame: () => void;
+}
+
+export const RoomHeader: React.FC<RoomHeaderProps> = ({ 
+  roomId, 
+  playerCount, 
+  showStartButton,
+  onStartGame 
+}) => {
+  const navigate = useNavigate();
+  const [copied, setCopied] = useState(false);
+
+  const copyRoomId = () => {
+    navigator.clipboard.writeText(roomId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <motion.div 
+      className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 mb-3"
+      whileHover={{ scale: 1.01 }}
+      transition={{ type: "spring", stiffness: 300 }}
+    >
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center space-x-3">
+          <motion.div
+            whileHover={{ rotate: 15, scale: 1.1 }}
+            transition={{ type: "spring", stiffness: 400 }}
+          >
+            <Home className="w-6 h-6 text-purple-400 cursor-pointer" 
+                onClick={() => navigate('/')}
+            />
+          </motion.div>
+          <div>
+            <h2 className="text-lg text-gray-400 font-medium">Room ID</h2>
+            <motion.div 
+              className="flex items-center space-x-2"
+              whileHover={{ x: 5 }}
+            >
+              <span className="text-xl font-bold text-white">{roomId}</span>
+              <motion.button
+                onClick={copyRoomId}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </motion.button>
+            </motion.div>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4 ml-auto">
+          {showStartButton && (
+            <motion.button
+              className="lg:hidden bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
+                       hover:bg-purple-700 transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onStartGame}
+            >
+              Start Game
+            </motion.button>
+          )}
+          
+          <motion.div 
+            className="hidden md:flex items-center space-x-2 bg-gray-700/50 px-3 py-1 rounded-full"
+            whileHover={{ scale: 1.05 }}
+          >
+            <div className="w-2 h-2 bg-green-400 rounded-full" />
+            <span className="text-sm text-gray-300">
+              {playerCount} Players Connected
+            </span>
+          </motion.div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+===== types\game.ts =====
+export interface GameSettings {
+  boardSize: {
+    rows: number;
+    cols: number;
+  };
+}
+
+export interface Player {
+  id: string;
+  name: string;
+  color: string;
+  isAdmin: boolean;
+  isActive: boolean;
+}
+
+export interface Cell {
+  orbs: number;
+  playerId: string | null;
+}
+
+export interface Message {
+  id: string;
+  playerId: string;
+  text: string;
+  timestamp: Date;
+}
+

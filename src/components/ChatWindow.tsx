@@ -1,32 +1,41 @@
+// ChatWindow.tsx
 import React, { useState } from 'react';
 import { MessageCircle, Send } from 'lucide-react';
 import { Message, Player } from '../types/game';
 import { motion } from 'framer-motion';
+import socket from '../socket';
 
 interface ChatWindowProps {
   messages: Message[];
   playerColors: Record<string, string>;
-  onSendMessage: (message: string) => void;
-  players: Player[]; // Add players prop
+  players: Player[];
+  roomId: string;          
+  currentPlayerName: string; 
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
   messages,
   playerColors,
-  onSendMessage,
   players,
+  roomId,  
+  currentPlayerName, 
 }) => {
   const [newMessage, setNewMessage] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessage.trim()) {
-      onSendMessage(newMessage);
+      // Emit a chat message with the room ID and current player's name.
+      socket.emit('sendChatMessage', {
+        roomId,
+        message: newMessage,
+        playerName: currentPlayerName,
+      });
       setNewMessage('');
     }
   };
 
-  // Function to get player name from ID
+  // Returns the player name given a player ID.
   const getPlayerName = (playerId: string) => {
     const player = players.find(p => p.id === playerId);
     return player ? player.name : playerId;
