@@ -211,16 +211,18 @@ const GameRoom: React.FC = () => {
     setIsExploding(false);
   };
 
-  const handleSendMessage = (text: string) => {
-    if (!gameLogic || !currentPlayer) return;
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      playerId: currentPlayer.id,
-      text,
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, newMessage]);
+  const assignPlayerColors = (players: Player[]) => {
+    return players.map((player, index) => ({
+      ...player,
+      color: Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length]
+    }));
   };
+  
+  useEffect(() => {
+    socket.on("playerListUpdate", (updatedPlayers: Player[]) => {
+      setPlayers(assignPlayerColors(updatedPlayers));
+    });
+  }, []);  
 
   return (
     <div className="min-h-screen bg-gray-900 relative">
@@ -260,7 +262,6 @@ const GameRoom: React.FC = () => {
             />
             <ChatWindow
               messages={messages}
-              playerColors={PLAYER_COLORS}
               players={players}
               roomId={roomId || ''}
               currentPlayerName={initialPlayerName}

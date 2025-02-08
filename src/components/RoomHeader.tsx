@@ -27,6 +27,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  
   return (
     <motion.div 
       className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 mb-3"

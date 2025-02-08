@@ -7,7 +7,6 @@ import socket from '../socket';
 
 interface ChatWindowProps {
   messages: Message[];
-  playerColors: Record<string, string>;
   players: Player[];
   roomId: string;          
   currentPlayerName: string; 
@@ -15,7 +14,6 @@ interface ChatWindowProps {
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
   messages,
-  playerColors,
   players,
   roomId,  
   currentPlayerName, 
@@ -25,7 +23,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessage.trim()) {
-      // Emit a chat message with the room ID and current player's name.
       socket.emit('sendChatMessage', {
         roomId,
         message: newMessage,
@@ -35,10 +32,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
-  // Returns the player name given a player ID.
+  // Returns the player's name given their id.
   const getPlayerName = (playerId: string) => {
     const player = players.find(p => p.id === playerId);
     return player ? player.name : playerId;
+  };
+
+  // Returns the player's assigned color from the players list.
+  const getPlayerColor = (playerId: string) => {
+    const player = players.find(p => p.id === playerId);
+    return player ? player.color : '#FFFFFF';
   };
 
   return (
@@ -61,20 +64,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       </motion.div>
       
       <div className="flex-1 overflow-y-auto mb-4 space-y-2">
-        {messages.map((msg) => (
-          <motion.div 
-            key={msg.id} 
-            className="text-sm"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            whileHover={{ scale: 1.02, x: 5 }}
-          >
-            <span className="font-medium" style={{ color: playerColors[msg.playerId] }}>
-              {getPlayerName(msg.playerId)}:
-            </span>{' '}
-            <span className="text-white">{msg.text}</span>
-          </motion.div>
-        ))}
+        {messages.map((msg) => {
+          const senderName = getPlayerName(msg.playerId);
+          // Remove duplicate sender name if the message text already begins with it
+          let displayText = msg.text;
+          const prefix = senderName + ':';
+          if (displayText.startsWith(prefix)) {
+            displayText = displayText.slice(prefix.length).trim();
+          }
+          return (
+            <motion.div 
+              key={msg.id} 
+              className="text-sm"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              whileHover={{ scale: 1.02, x: 5 }}
+            >
+              <span className="font-medium" style={{ color: getPlayerColor(msg.playerId) }}>
+                {senderName}:
+              </span>{' '}
+              <span className="text-white">{displayText}</span>
+            </motion.div>
+          );
+        })}
       </div>
 
       <form onSubmit={handleSubmit} className="flex space-x-2">
