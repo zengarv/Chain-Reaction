@@ -21,8 +21,7 @@ const PLAYER_COLORS = {
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
-  boardSize: { rows: 9, cols: 6 },
-  maxPlayers: 2
+  boardSize: { rows: 9, cols: 6 }
 };
 
 const GameRoom: React.FC = () => {
@@ -44,17 +43,14 @@ const GameRoom: React.FC = () => {
 
   useEffect(() => {
     const settings = location.state?.settings || DEFAULT_SETTINGS;
-    const { maxPlayers } = settings;
     
-    const initialPlayers = Array.from({ length: maxPlayers }, (_, index) => ({
-      id: `player${index + 1}`,
-      name: index === 0 && location.state?.playerName ? 
-        location.state.playerName : 
-        `Player ${index + 1}`,
-      color: PLAYER_COLORS[`player${index + 1}` as keyof typeof PLAYER_COLORS],
-      isAdmin: index === 0,
+    const initialPlayers = [{
+      id: 'player1',
+      name: location.state?.playerName || 'Player 1',
+      color: PLAYER_COLORS.player1,
+      isAdmin: true,
       isActive: true
-    }));
+    }];
 
     setPlayers(initialPlayers);
     initializeGame(initialPlayers, settings);
@@ -86,7 +82,6 @@ const GameRoom: React.FC = () => {
       await gameLogic.handleExplosions(updateBoard, 200);
       gameLogic.updatePlayerStatus();
       
-      // Update only the active status of players
       setPlayers(prevPlayers => 
         prevPlayers.map(player => ({
           ...player,
@@ -97,7 +92,6 @@ const GameRoom: React.FC = () => {
       const activePlayers = gameLogic.getActivePlayers();
       if (activePlayers.length <= 1) {
         setGameStarted(false);
-        // Find the winning player from the current players array to preserve the name
         const winningPlayer = players.find(p => p.id === (activePlayers[0]?.id || currentPlayer.id));
         setWinner(winningPlayer || currentPlayer);
       } else {
@@ -115,31 +109,25 @@ const GameRoom: React.FC = () => {
   const handleStartGame = () => {
     if (players.length >= 2) {
       setGameStarted(true);
-      // Reset the game state to ensure a clean start
       const settings = location.state?.settings || DEFAULT_SETTINGS;
       initializeGame(players, settings);
     }
   };
 
-
   const handlePlayAgain = () => {
     const settings = location.state?.settings || DEFAULT_SETTINGS;
-    const { maxPlayers } = settings;
     
-    // Create fresh players array with preserved names
     const initialPlayers = players.map(player => ({
       ...player,
-      isActive: true // Reset active status
+      isActive: true
     }));
   
-    // Create new game logic instance
     const newGameLogic = new GameLogic(
       settings.boardSize.rows,
       settings.boardSize.cols,
       initialPlayers
     );
   
-    // Explicitly reset all game state
     setGameLogic(newGameLogic);
     setBoard(newGameLogic.getBoard());
     setPlayers(initialPlayers);
@@ -148,30 +136,7 @@ const GameRoom: React.FC = () => {
     setGameStarted(false);
     setMessages([]);
     setLastMove(null);
-    setIsExploding(false); // Add this line to ensure explosion state is reset
-  };
-
-  const handleRenamePlayer = (playerId: string, newName: string) => {
-    setPlayers(prevPlayers =>
-      prevPlayers.map(player =>
-        player.id === playerId
-          ? { ...player, name: newName }
-          : player
-      )
-    );
-  };
-
-  const handleShufflePlayers = () => {
-    setPlayers(prevPlayers => {
-      const shuffled = [...prevPlayers];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        const temp = shuffled[i].name;
-        shuffled[i] = { ...shuffled[i], name: shuffled[j].name };
-        shuffled[j] = { ...shuffled[j], name: temp };
-      }
-      return shuffled;
-    });
+    setIsExploding(false);
   };
 
   const handleSendMessage = (text: string) => {
@@ -225,7 +190,7 @@ const GameRoom: React.FC = () => {
                   color: winner.color
                 }}
                 onPlayAgain={handlePlayAgain}
-                onShufflePlayers={handleShufflePlayers}
+                onShufflePlayers={() => {}}
               />
             )}
           </motion.div>
@@ -236,8 +201,6 @@ const GameRoom: React.FC = () => {
             players={players}
             currentPlayer={currentPlayer.id}
             gameStarted={gameStarted}
-            onRenamePlayer={handleRenamePlayer}
-            onShufflePlayers={handleShufflePlayers}
           />
           
           <ChatWindow

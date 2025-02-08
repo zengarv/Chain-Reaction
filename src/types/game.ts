@@ -3,7 +3,6 @@ export interface GameSettings {
     rows: number;
     cols: number;
   };
-  maxPlayers: number;
 }
 
 export interface Player {

@@ -1,18 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gamepad2 } from 'lucide-react';
+import { Gamepad2, Grid, User } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { motion } from 'framer-motion';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [boardSize, setBoardSize] = useState({ rows: 9, cols: 6 });
-  const [maxPlayers, setMaxPlayers] = useState(2);
+  const [username, setUsername] = useState('');
 
   const createRoom = () => {
+    if (!username.trim()) return;
     const roomId = nanoid(10);
     navigate(`/room/${roomId}`, {
-      state: { isAdmin: true, settings: { boardSize, maxPlayers } }
+      state: { 
+        isAdmin: true, 
+        settings: { boardSize },
+        playerName: username
+      }
     });
   };
 
@@ -72,7 +77,26 @@ const LandingPage: React.FC = () => {
 
         <div className="space-y-6">
           <motion.div variants={itemVariants}>
-            <label className="block text-sm font-medium mb-2">Board Size</label>
+            <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+              <User className="w-4 h-4 text-purple-500" />
+              Username
+            </label>
+            <motion.input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-700 rounded-lg"
+              placeholder="Enter your username"
+              required
+              whileHover={{ scale: 1.02 }}
+            />
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+              <Grid className="w-4 h-4 text-purple-500" />
+              Board Size
+            </label>
             <div className="grid grid-cols-2 gap-4">
               <motion.div whileHover={{ scale: 1.02 }}>
                 <input
@@ -99,19 +123,6 @@ const LandingPage: React.FC = () => {
             </div>
           </motion.div>
 
-          <motion.div variants={itemVariants}>
-            <label className="block text-sm font-medium mb-2">Max Players</label>
-            <motion.input
-              type="number"
-              value={maxPlayers}
-              onChange={(e) => setMaxPlayers(parseInt(e.target.value))}
-              className="w-full px-4 py-2 bg-gray-700 rounded-lg"
-              min="2"
-              max="8"
-              whileHover={{ scale: 1.02 }}
-            />
-          </motion.div>
-
           <motion.button
             onClick={createRoom}
             className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium
@@ -119,6 +130,7 @@ const LandingPage: React.FC = () => {
             variants={itemVariants}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            disabled={!username.trim()}
           >
             Create Room
           </motion.button>
