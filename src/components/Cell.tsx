@@ -1,3 +1,4 @@
+// Cell.tsx
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Orb from './Orb';
@@ -10,9 +11,9 @@ interface CellProps {
     playerId: string | null;
   };
   criticalMass: number;
-  playerColors: Record<string, string>;
+  ownerColor: string;
   onCellClick: (row: number, col: number) => void;
-  currentPlayer: string;
+  currentPlayerColor: string;
   isLastMove: boolean;
 }
 
@@ -21,9 +22,9 @@ const Cell: React.FC<CellProps> = ({
   colIndex,
   cell,
   criticalMass,
-  playerColors,
+  ownerColor,
   onCellClick,
-  currentPlayer,
+  currentPlayerColor,
   isLastMove,
 }) => {
   const cellRef = useRef<HTMLDivElement>(null);
@@ -54,8 +55,8 @@ const Cell: React.FC<CellProps> = ({
       rotate: 0,
     },
     explode: {
-      scale: [1, 1.1, 0.9, 1], // Reduced scale for smaller cells
-      rotate: [0, 5, -5, 0], // Reduced rotation for smaller cells
+      scale: [1, 1.1, 0.9, 1],
+      rotate: [0, 5, -5, 0],
       transition: {
         duration: 0.4,
         ease: "easeInOut",
@@ -72,14 +73,14 @@ const Cell: React.FC<CellProps> = ({
                  backdrop-blur-sm hover:bg-gray-700/50 cursor-pointer overflow-hidden
                  transition-colors duration-200"
       style={{
-        borderColor: isLastMove ? playerColors[cell.playerId!] : 'transparent',
+        borderColor: isLastMove ? ownerColor : 'transparent',
       }}
       initial="initial"
       variants={cellVariants}
       animate={cell.orbs >= criticalMass ? "explode" : "initial"}
       whileHover={{ 
-        scale: 1.02, // Reduced hover scale
-        borderColor: playerColors[currentPlayer],
+        scale: 1.02,
+        borderColor: currentPlayerColor,
       }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onCellClick(rowIndex, colIndex)}
@@ -92,7 +93,7 @@ const Cell: React.FC<CellProps> = ({
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ 
-              scale: 1.2, // Reduced exit scale
+              scale: 1.2,
               opacity: 0,
               transition: { 
                 duration: 0.2,
@@ -102,7 +103,7 @@ const Cell: React.FC<CellProps> = ({
             className="w-full h-full flex items-center justify-center"
           >
             <Orb
-              color={playerColors[cell.playerId!]}
+              color={ownerColor}
               count={cell.orbs}
               isUnstable={isUnstable}
               cellSize={Math.min(cellSize.width, cellSize.height)}

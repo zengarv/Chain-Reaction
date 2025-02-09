@@ -229,13 +229,13 @@ const GameRoom: React.FC = () => {
               isAdmin={isAdmin}
             />
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">
-              <GameBoard
-                board={board}
-                currentPlayer={currentPlayer}
-                onCellClick={handleCellClick}
-                playerColors={PLAYER_COLORS}
-                lastMove={lastMove}
-              />
+            <GameBoard
+              board={board}
+              currentPlayer={currentPlayer}
+              onCellClick={handleCellClick}
+              players={players}
+              lastMove={lastMove}
+            />
               {winner && (
                 <GameOver
                   winner={{ name: winner.name, color: winner.color }}
