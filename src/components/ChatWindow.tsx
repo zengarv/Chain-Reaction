@@ -73,7 +73,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto mb-4 space-y-2 pr-2 custom-scrollbar"
       >
-        {messages.map((msg) => {
+        {messages.map((msg, index) => {
           const senderName = getPlayerName(msg.playerId);
           // Remove duplicate sender name if the message text already begins with it
           let displayText = msg.text;
@@ -83,7 +83,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           }
           return (
             <motion.div 
-              key={msg.id} 
+              key={msg.id || index}  // Use msg.id if available; otherwise, use the index.
               className="text-sm"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}

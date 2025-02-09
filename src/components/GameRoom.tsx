@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// GameRoom.tsx
+import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import GameBoard from './GameBoard';
 import PlayersList from './PlayersList';
 import ChatWindow from './ChatWindow';
 import { Cell, GameSettings, Message, Player } from '../types/game';
-import { GameLogic } from './GameLogic';
 import { RoomHeader } from './RoomHeader';
 import GameOver from './GameOver';
 import socket from '../socket';
@@ -25,16 +25,26 @@ const DEFAULT_SETTINGS: GameSettings = {
   boardSize: { rows: 9, cols: 6 }
 };
 
+const createEmptyBoard = (rows: number, cols: number): Cell[][] => {
+  const board: Cell[][] = [];
+  for (let i = 0; i < rows; i++) {
+    const row: Cell[] = [];
+    for (let j = 0; j < cols; j++) {
+      row.push({ orbs: 0, playerId: null });
+    }
+    board.push(row);
+  }
+  return board;
+};
+
 const GameRoom: React.FC = () => {
   const { roomId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Use sessionStorage so that each browser tab gets its own player name and admin status.
+  // Retrieve player info from location.state or sessionStorage.
   const storedPlayerName = sessionStorage.getItem("playerName");
   const storedIsAdmin = sessionStorage.getItem("isAdmin") === "true";
-
-  // Use location.state if available; otherwise, fall back to sessionStorage.
   const initialPlayerName = location.state?.playerName || storedPlayerName;
   const isAdmin = (location.state?.isAdmin !== undefined)
     ? location.state.isAdmin
@@ -54,95 +64,116 @@ const GameRoom: React.FC = () => {
     );
   }
 
-  // Create a default player object based on the provided name and admin flag.
+  // Create a default player. (The id will be updated by the server later.)
   const defaultPlayer: Player = {
-    id: initialPlayerName,
+    id: '',
     name: initialPlayerName,
     color: PLAYER_COLORS.player1,
     isAdmin: isAdmin,
     isActive: true,
   };
 
-  // Initialize state synchronously so that gameLogic and currentPlayer are never null.
-  const [gameLogic, setGameLogic] = useState<GameLogic>(
-    new GameLogic(DEFAULT_SETTINGS.boardSize.rows, DEFAULT_SETTINGS.boardSize.cols, [defaultPlayer])
-  );
-  const [board, setBoard] = useState<Cell[][]>(gameLogic.getBoard());
-  const [players, setPlayers] = useState<Player[]>([defaultPlayer]);
-  const [isExploding, setIsExploding] = useState(false);
+  // Preinitialize board for admin; for non-admin, start with an empty array.
+  const boardSize = (location.state?.settings?.boardSize) || DEFAULT_SETTINGS.boardSize;
+  const initialBoard: Cell[][] = isAdmin ? createEmptyBoard(boardSize.rows, boardSize.cols) : [];
+
+  const [board, setBoard] = useState<Cell[][]>(initialBoard);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<Player>(defaultPlayer);
   const [winner, setWinner] = useState<Player | null>(null);
   const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(null);
+  const [isExploding, setIsExploding] = useState(false);
 
-  // In GameRoom.tsx, inside the useEffect that connects to the room:
+  // Send joinRoom event.
   useEffect(() => {
     socket.emit("joinRoom", { 
       roomId, 
       playerName: initialPlayerName, 
       isAdmin, 
-      gridSize: isAdmin ? (location.state?.settings?.boardSize || DEFAULT_SETTINGS.boardSize) : undefined 
+      gridSize: isAdmin ? boardSize : undefined 
     });
-    
-    const handlePlayerListUpdate = (updatedPlayers: Player[]) => setPlayers(updatedPlayers);
-    const handleChatMessage = (msg: Message) => setMessages(prev => [...prev, msg]);
+    // (Other listeners like chatMessage can be set up here if needed.)
+  }, [roomId, initialPlayerName, isAdmin, boardSize]);
 
-    socket.on("playerListUpdate", handlePlayerListUpdate);
-    socket.on("chatMessage", handleChatMessage);
-
-    return () => {
-      socket.off("playerListUpdate", handlePlayerListUpdate);
-      socket.off("chatMessage", handleChatMessage);
-    };
-  }, [roomId, initialPlayerName, isAdmin]);
-
-useEffect(() => {
-  socket.on("gridSizeUpdate", (gridSize: { rows: number; cols: number }) => {
-    // Re‑initialize game logic using the grid size from the server and current players list.
-    const newLogic = new GameLogic(gridSize.rows, gridSize.cols, players);
-    setGameLogic(newLogic);
-    setBoard(newLogic.getBoard());
-  });
-
-  return () => {
-    socket.off("gridSizeUpdate");
-  };
-}, [players]);
-
-
-  // For the admin: reinitialize the game logic (using settings from location.state if available).
+  // Listen for gridSizeUpdate to set board for non-admins.
   useEffect(() => {
-    if (isAdmin) {
-      const settings = location.state?.settings || DEFAULT_SETTINGS;
-      socket.emit("setGridSize", { roomId, gridSize: settings.boardSize });
-    }
-  
     socket.on("gridSizeUpdate", (gridSize: { rows: number; cols: number }) => {
-      setGameLogic(new GameLogic(gridSize.rows, gridSize.cols, players));
-      setBoard(new GameLogic(gridSize.rows, gridSize.cols, players).getBoard());
+      const emptyBoard = createEmptyBoard(gridSize.rows, gridSize.cols);
+      setBoard(emptyBoard);
     });
-  
     return () => {
       socket.off("gridSizeUpdate");
     };
-  }, [isAdmin, players]);
+  }, []);
+
+  // Listen for updateGameState events.
+  useEffect(() => {
+    socket.on("updateGameState", (data: { board: any[][]; currentTurn: string; players: Player[]; winner: Player | null }) => {
+      // Convert the server board (with 'count' and 'owner') to the client board (with 'orbs' and 'playerId')
+      const convertedBoard = data.board.map(row =>
+        row.map(cell => ({
+          orbs: cell.count,
+          playerId: cell.owner
+        }))
+      );
+      if (convertedBoard && convertedBoard.length > 0 && convertedBoard[0].length > 0) {
+        setBoard(convertedBoard);
+      } else {
+        console.warn("Received invalid board data:", data.board);
+      }
+      // Also reassign colors to players (if necessary)
+      const coloredPlayers = data.players.map((player, index) => ({
+        ...player,
+        color: Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length],
+      }));
+      setPlayers(coloredPlayers);
+      
+      const cp = coloredPlayers.find(p => p.id === data.currentTurn);
+      if (cp) {
+        setCurrentPlayer(cp);
+      }
+      if (data.winner) {
+        setWinner(data.winner);
+        setGameStarted(false);
+      } else {
+        setGameStarted(true);
+      }
+    });
+    return () => {
+      socket.off("updateGameState");
+    };
+  }, []);
   
 
-  // For non-admins: initialize a default game state (so the board is visible) and listen for gameStart.
+
+  useEffect(() => {
+    const handlePlayerListUpdate = (updatedPlayers: Player[]) => {
+      const coloredPlayers = updatedPlayers.map((player, index) => ({
+        ...player,
+        color: Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length],
+      }));
+      setPlayers(coloredPlayers);
+    };
+    socket.on("playerListUpdate", handlePlayerListUpdate);
+    return () => {
+      socket.off("playerListUpdate", handlePlayerListUpdate);
+    };
+  }, []);
+
+  // For non-admins: listen for gameStart (if sent).
   useEffect(() => {
     if (!isAdmin) {
-      socket.on("gameStart", (data: { players: Player[]; board: Cell[][]; settings: GameSettings }) => {
-        const newGameLogic = new GameLogic(
-          data.settings.boardSize.rows,
-          data.settings.boardSize.cols,
-          data.players,
-          data.board
+      socket.on("gameStart", (data: { players: Player[]; board: any[][]; settings: GameSettings }) => {
+        const convertedBoard = data.board.map(row =>
+          row.map(cell => ({
+            orbs: cell.count,
+            playerId: cell.owner
+          }))
         );
-        setGameLogic(newGameLogic);
-        setBoard(newGameLogic.getBoard());
+        setBoard(convertedBoard);
         setPlayers(data.players);
-        setCurrentPlayer(newGameLogic.getCurrentPlayer());
         setGameStarted(true);
       });
     }
@@ -150,97 +181,38 @@ useEffect(() => {
       socket.off("gameStart");
     };
   }, [isAdmin]);
-
-  const updateBoard = useCallback((newBoard: Cell[][]) => {
-    setBoard([...newBoard]);
-  }, []);
-
-  const handleCellClick = async (row: number, col: number) => {
-    if (!gameLogic || !currentPlayer || isExploding) return;
-    if (!gameLogic.isValidMove(row, col, currentPlayer.id)) return;
   
+
+  // When a cell is clicked, emit a "makeMove" event.
+  const handleCellClick = (row: number, col: number) => {
+    if (!gameStarted || isExploding) return;
     setLastMove({ row, col });
-    const willExplode = gameLogic.addOrb(row, col);
-    updateBoard(gameLogic.getBoard());
-  
-    if (willExplode) {
-      setIsExploding(true);
-      await gameLogic.handleExplosions(updateBoard, 200);
-      gameLogic.updatePlayerStatus();
-      
-      setPlayers(prevPlayers =>
-        prevPlayers.map(player => ({
-          ...player,
-          isActive: gameLogic.getActivePlayers().some(p => p.id === player.id)
-        }))
-      );
-      
-      const activePlayers = gameLogic.getActivePlayers();
-      if (activePlayers.length <= 1) {
-        setGameStarted(false);
-        const winningPlayer = players.find(p => p.id === (activePlayers[0]?.id || currentPlayer.id));
-        setWinner(winningPlayer || currentPlayer);
-      } else {
-        gameLogic.getNextPlayer();
-        setCurrentPlayer(gameLogic.getCurrentPlayer());
-      }
-      
-      setIsExploding(false);
-    } else {
-      gameLogic.getNextPlayer();
-      setCurrentPlayer(gameLogic.getCurrentPlayer());
-    }
+    socket.emit("makeMove", { roomId, row, col });
   };
 
+  // The admin starts the game.
   const handleStartGame = () => {
     if (players.length >= 2) {
-      const settings = location.state?.settings || DEFAULT_SETTINGS;
-      // Emit gameStart so non-admins update their game state.
-      socket.emit("gameStart", {
-        roomId,
-        players,
-        settings,
-        board: new GameLogic(settings.boardSize.rows, settings.boardSize.cols, players).getBoard(),
-      });
-      // Reinitialize game logic for the admin.
-      const newGameLogic = new GameLogic(settings.boardSize.rows, settings.boardSize.cols, players);
-      setGameLogic(newGameLogic);
-      setBoard(newGameLogic.getBoard());
-      setCurrentPlayer(newGameLogic.getCurrentPlayer());
-      setGameStarted(true);
+      socket.emit("gameStart", { roomId });
     }
   };
 
+  // Reset the game.
   const handlePlayAgain = () => {
-    const settings = location.state?.settings || DEFAULT_SETTINGS;
-    const initialPlayers = players.map(player => ({
-      ...player,
-      isActive: true
-    }));
-    const newGameLogic = new GameLogic(settings.boardSize.rows, settings.boardSize.cols, initialPlayers);
-    setGameLogic(newGameLogic);
-    setBoard(newGameLogic.getBoard());
-    setPlayers(initialPlayers);
-    setCurrentPlayer(newGameLogic.getCurrentPlayer());
+    socket.emit("playAgain", { roomId });
     setWinner(null);
-    setGameStarted(false);
-    setMessages([]);
-    setLastMove(null);
-    setIsExploding(false);
   };
 
-  const assignPlayerColors = (players: Player[]) => {
-    return players.map((player, index) => ({
-      ...player,
-      color: Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length]
-    }));
-  };
-  
   useEffect(() => {
-    socket.on("playerListUpdate", (updatedPlayers: Player[]) => {
-      setPlayers(assignPlayerColors(updatedPlayers));
-    });
-  }, []);  
+    const handleChatMessage = (msg: Message) => {
+      setMessages(prev => [...prev, msg]);
+    };
+    socket.on("chatMessage", handleChatMessage);
+    return () => {
+      socket.off("chatMessage", handleChatMessage);
+    };
+  }, []);
+  
 
   return (
     <div className="min-h-screen bg-gray-900 relative">

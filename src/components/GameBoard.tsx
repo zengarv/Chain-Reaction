@@ -17,6 +17,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
   playerColors,
   lastMove,
 }) => {
+  
+    // Guard clause: if board is not yet defined or empty, render a loading message.
+  if (!board || board.length === 0 || !board[0]) {
+    return <div className="text-white">Loading board...</div>;
+  }
+
   const getCriticalMass = (row: number, col: number): number => {
     const isCorner = (row === 0 || row === board.length - 1) && 
                     (col === 0 || col === board[0].length - 1);

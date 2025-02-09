@@ -76,7 +76,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
             >
               <Clock className="w-4 h-4 text-purple-400" />
               <span className="text-sm">
-                {isAdmin ? "Waiting for players..." : "Waiting for admin..."}
+                {isAdmin ? "Waiting for players" : "Waiting for admin"}
               </span>
             </motion.div>
           )}
