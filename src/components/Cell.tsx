@@ -1,4 +1,3 @@
-// Cell.tsx
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Orb from './Orb';
@@ -15,6 +14,7 @@ interface CellProps {
   onCellClick: (row: number, col: number) => void;
   currentPlayerColor: string;
   isLastMove: boolean;
+  isCurrentPlayerTurn: boolean; // Controls hover and click behavior
 }
 
 const Cell: React.FC<CellProps> = ({
@@ -26,6 +26,7 @@ const Cell: React.FC<CellProps> = ({
   onCellClick,
   currentPlayerColor,
   isLastMove,
+  isCurrentPlayerTurn,
 }) => {
   const cellRef = useRef<HTMLDivElement>(null);
   const [cellSize, setCellSize] = useState({ width: 0, height: 0 });
@@ -41,11 +42,9 @@ const Cell: React.FC<CellProps> = ({
 
     updateCellSize();
     const resizeObserver = new ResizeObserver(updateCellSize);
-    
     if (cellRef.current) {
       resizeObserver.observe(cellRef.current);
     }
-
     return () => resizeObserver.disconnect();
   }, []);
 
@@ -59,10 +58,10 @@ const Cell: React.FC<CellProps> = ({
       rotate: [0, 5, -5, 0],
       transition: {
         duration: 0.4,
-        ease: "easeInOut",
+        ease: 'easeInOut',
         times: [0, 0.2, 0.5, 1],
-      }
-    }
+      },
+    },
   };
 
   return (
@@ -70,20 +69,22 @@ const Cell: React.FC<CellProps> = ({
       ref={cellRef}
       key={`${rowIndex}-${colIndex}`}
       className="aspect-square border-2 border-transparent rounded-lg bg-gray-800/50 
-                 backdrop-blur-sm hover:bg-gray-700/50 cursor-pointer overflow-hidden
-                 transition-colors duration-200"
+                 backdrop-blur-sm cursor-pointer overflow-hidden transition-colors duration-200"
       style={{
         borderColor: isLastMove ? ownerColor : 'transparent',
       }}
       initial="initial"
       variants={cellVariants}
-      animate={cell.orbs >= criticalMass ? "explode" : "initial"}
-      whileHover={{ 
-        scale: 1.02,
-        borderColor: currentPlayerColor,
-      }}
+      animate={cell.orbs >= criticalMass ? 'explode' : 'initial'}
+      whileHover={
+        isCurrentPlayerTurn
+          ? { scale: 1.02, borderColor: currentPlayerColor }
+          : {}
+      }
       whileTap={{ scale: 0.98 }}
-      onClick={() => onCellClick(rowIndex, colIndex)}
+      onClick={() => {
+        if (isCurrentPlayerTurn) onCellClick(rowIndex, colIndex);
+      }}
       layout
     >
       <AnimatePresence mode="wait">
@@ -92,13 +93,10 @@ const Cell: React.FC<CellProps> = ({
             key={`orb-${cell.orbs}-${cell.playerId}`}
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ 
+            exit={{
               scale: 1.2,
               opacity: 0,
-              transition: { 
-                duration: 0.2,
-                ease: "easeOut"
-              }
+              transition: { duration: 0.2, ease: 'easeOut' },
             }}
             className="w-full h-full flex items-center justify-center"
           >

@@ -1,4 +1,3 @@
-// GameRoom.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -11,7 +10,7 @@ import GameOver from './GameOver';
 import socket from '../socket';
 
 const PLAYER_COLORS: Record<string, string> = {
-  player1: '#FF4C3C', 
+  player1: '#FF4C3C',
   player2: '#2EFF31',
   player3: '#3498FF',
   player4: '#F1C40F',
@@ -22,7 +21,7 @@ const PLAYER_COLORS: Record<string, string> = {
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
-  boardSize: { rows: 9, cols: 6 }
+  boardSize: { rows: 9, cols: 6 },
 };
 
 const createEmptyBoard = (rows: number, cols: number): Cell[][] => {
@@ -42,13 +41,13 @@ const GameRoom: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Retrieve player info from location.state or sessionStorage.
-  const storedPlayerName = sessionStorage.getItem("playerName");
-  const storedIsAdmin = sessionStorage.getItem("isAdmin") === "true";
+  const storedPlayerName = sessionStorage.getItem('playerName');
+  const storedIsAdmin = sessionStorage.getItem('isAdmin') === 'true';
   const initialPlayerName = location.state?.playerName || storedPlayerName;
-  const isAdmin = (location.state?.isAdmin !== undefined)
-    ? location.state.isAdmin
-    : storedIsAdmin;
+  const isAdmin =
+    location.state?.isAdmin !== undefined
+      ? location.state.isAdmin
+      : storedIsAdmin;
 
   useEffect(() => {
     if (!initialPlayerName) {
@@ -64,7 +63,6 @@ const GameRoom: React.FC = () => {
     );
   }
 
-  // Create a default player. (The id will be updated by the server later.)
   const defaultPlayer: Player = {
     id: '',
     name: initialPlayerName,
@@ -73,9 +71,12 @@ const GameRoom: React.FC = () => {
     isActive: true,
   };
 
-  // Preinitialize board for admin; for non-admin, start with an empty array.
-  const boardSize = (location.state?.settings?.boardSize) || DEFAULT_SETTINGS.boardSize;
-  const initialBoard: Cell[][] = isAdmin ? createEmptyBoard(boardSize.rows, boardSize.cols) : [];
+  const boardSize =
+    (location.state?.settings?.boardSize as GameSettings['boardSize']) ||
+    DEFAULT_SETTINGS.boardSize;
+  const initialBoard: Cell[][] = isAdmin
+    ? createEmptyBoard(boardSize.rows, boardSize.cols)
+    : [];
 
   const [board, setBoard] = useState<Cell[][]>(initialBoard);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -83,159 +84,159 @@ const GameRoom: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<Player>(defaultPlayer);
   const [winner, setWinner] = useState<Player | null>(null);
-  const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(null);
+  const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(
+    null
+  );
   const [isExploding, setIsExploding] = useState(false);
+  const [myId, setMyId] = useState<string>('');
 
-  // Send joinRoom event.
+  // Ensure myId is always a string
   useEffect(() => {
-    socket.emit("joinRoom", { 
-      roomId, 
-      playerName: initialPlayerName, 
-      isAdmin, 
-      gridSize: isAdmin ? boardSize : undefined 
+    setMyId(socket.id || '');
+  }, []);
+
+  useEffect(() => {
+    socket.emit('joinRoom', {
+      roomId,
+      playerName: initialPlayerName,
+      isAdmin,
+      gridSize: isAdmin ? boardSize : undefined,
     });
-    // (Other listeners like chatMessage can be set up here if needed.)
   }, [roomId, initialPlayerName, isAdmin, boardSize]);
 
-  // Listen for gridSizeUpdate to set board for non-admins.
+  // Listen for gridSizeUpdate to set the board for non-admins
   useEffect(() => {
-    socket.on("gridSizeUpdate", (gridSize: { rows: number; cols: number }) => {
+    socket.on('gridSizeUpdate', (gridSize: { rows: number; cols: number }) => {
       const emptyBoard = createEmptyBoard(gridSize.rows, gridSize.cols);
       setBoard(emptyBoard);
     });
     return () => {
-      socket.off("gridSizeUpdate");
+      socket.off('gridSizeUpdate');
     };
   }, []);
 
-  // Listen for updateGameState events.
+  // Listen for updateGameState to update board, players, and current turn
   useEffect(() => {
-    socket.on("updateGameState", (data: { board: any[][]; currentTurn: string; players: Player[]; winner: Player | null }) => {
-      // Convert the server board (with 'count' and 'owner') to the client board (with 'orbs' and 'playerId')
-      const convertedBoard = data.board.map(row =>
-        row.map(cell => ({
-          orbs: cell.count,
-          playerId: cell.owner
-        }))
-      );
-      if (convertedBoard && convertedBoard.length > 0 && convertedBoard[0].length > 0) {
+    socket.on(
+      'updateGameState',
+      (data: {
+        board: any[][];
+        currentTurn: string;
+        players: Player[];
+        winner: Player | null;
+        lastMove?: { row: number; col: number };
+      }) => {
+        const convertedBoard = data.board.map((row) =>
+          row.map((cell) => ({
+            orbs: cell.count,
+            playerId: cell.owner,
+          }))
+        );
         setBoard(convertedBoard);
-      } else {
-        console.warn("Received invalid board data:", data.board);
+  
+        const coloredPlayers = data.players.map((player, index) => ({
+          ...player,
+          color: Object.values(PLAYER_COLORS)[
+            index % Object.values(PLAYER_COLORS).length
+          ],
+        }));
+        setPlayers(coloredPlayers);
+  
+        const cp = coloredPlayers.find((p) => p.id === data.currentTurn);
+        if (cp) {
+          setCurrentPlayer(cp);
+        }
+        if (data.winner) {
+          setWinner(data.winner);
+          setGameStarted(false);
+        } else {
+          setGameStarted(true);
+        }
+  
+        // Update lastMove regardless of which player made the move
+        setLastMove(data.lastMove || null);
       }
-      // Also reassign colors to players (if necessary)
-      const coloredPlayers = data.players.map((player, index) => ({
-        ...player,
-        color: Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length],
-      }));
-      setPlayers(coloredPlayers);
-      
-      const cp = coloredPlayers.find(p => p.id === data.currentTurn);
-      if (cp) {
-        setCurrentPlayer(cp);
-      }
-      if (data.winner) {
-        setWinner(data.winner);
-        setGameStarted(false);
-      } else {
-        setGameStarted(true);
-      }
-    });
+    );
     return () => {
-      socket.off("updateGameState");
+      socket.off('updateGameState');
     };
   }, []);
   
 
-
+  // Listen for player list updates so the player count reflects new joins
   useEffect(() => {
     const handlePlayerListUpdate = (updatedPlayers: Player[]) => {
       const coloredPlayers = updatedPlayers.map((player, index) => ({
         ...player,
-        color: Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length],
+        color: Object.values(PLAYER_COLORS)[
+          index % Object.values(PLAYER_COLORS).length
+        ],
       }));
       setPlayers(coloredPlayers);
     };
-    socket.on("playerListUpdate", handlePlayerListUpdate);
+    socket.on('playerListUpdate', handlePlayerListUpdate);
     return () => {
-      socket.off("playerListUpdate", handlePlayerListUpdate);
+      socket.off('playerListUpdate', handlePlayerListUpdate);
     };
   }, []);
 
-  // For non-admins: listen for gameStart (if sent).
+  // Listen for chat messages
   useEffect(() => {
-    if (!isAdmin) {
-      socket.on("gameStart", (data: { players: Player[]; board: any[][]; settings: GameSettings }) => {
-        const convertedBoard = data.board.map(row =>
-          row.map(cell => ({
-            orbs: cell.count,
-            playerId: cell.owner
-          }))
-        );
-        setBoard(convertedBoard);
-        setPlayers(data.players);
-        setGameStarted(true);
-      });
-    }
-    return () => {
-      socket.off("gameStart");
+    const handleChatMessage = (msg: Message) => {
+      setMessages((prev) => [...prev, msg]);
     };
-  }, [isAdmin]);
-  
+    socket.on('chatMessage', handleChatMessage);
+    return () => {
+      socket.off('chatMessage', handleChatMessage);
+    };
+  }, []);
 
-  // When a cell is clicked, emit a "makeMove" event.
   const handleCellClick = (row: number, col: number) => {
     if (!gameStarted || isExploding) return;
     setLastMove({ row, col });
-    socket.emit("makeMove", { roomId, row, col });
+    socket.emit('makeMove', { roomId, row, col });
   };
 
-  // The admin starts the game.
   const handleStartGame = () => {
     if (players.length >= 2) {
-      socket.emit("gameStart", { roomId });
+      socket.emit('gameStart', { roomId });
     }
   };
 
-  // Reset the game.
   const handlePlayAgain = () => {
-    socket.emit("playAgain", { roomId });
+    socket.emit('playAgain', { roomId });
     setWinner(null);
   };
 
-  useEffect(() => {
-    const handleChatMessage = (msg: Message) => {
-      setMessages(prev => [...prev, msg]);
-    };
-    socket.on("chatMessage", handleChatMessage);
-    return () => {
-      socket.off("chatMessage", handleChatMessage);
-    };
-  }, []);
-  
-
   return (
     <div className="min-h-screen bg-gray-900 relative">
-      <motion.div className="p-3 lg:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <motion.div
+        className="p-3 lg:p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
           <div className="lg:col-span-3 relative">
-            <RoomHeader 
-              roomId={roomId || ''} 
+            <RoomHeader
+              roomId={roomId || ''}
               playerCount={players.length}
               currentPlayer={currentPlayer}
-              showStartButton={!gameStarted && currentPlayer.isAdmin && players.length >= 2}
+              showStartButton={
+                !gameStarted && currentPlayer.isAdmin && players.length >= 2
+              }
               onStartGame={handleStartGame}
               gameStarted={gameStarted}
               isAdmin={isAdmin}
             />
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">
-            <GameBoard
-              board={board}
-              currentPlayer={currentPlayer}
-              onCellClick={handleCellClick}
-              players={players}
-              lastMove={lastMove}
-            />
+              <GameBoard
+                board={board}
+                currentPlayer={currentPlayer}
+                onCellClick={handleCellClick}
+                players={players}
+                lastMove={lastMove}
+                isMyTurn={myId === currentPlayer.id}
+              />
               {winner && (
                 <GameOver
                   winner={{ name: winner.name, color: winner.color }}

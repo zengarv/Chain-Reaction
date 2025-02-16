@@ -1,4 +1,3 @@
-// GameBoard.tsx
 import React from 'react';
 import { Cell as CellType, Player } from '../types/game';
 import Cell from './Cell';
@@ -9,6 +8,7 @@ interface GameBoardProps {
   currentPlayer: Player;
   players: Player[];
   lastMove: { row: number; col: number } | null;
+  isMyTurn: boolean; // Indicates if the logged-in user is the current turn player
 }
 
 const GameBoard: React.FC<GameBoardProps> = ({
@@ -17,25 +17,28 @@ const GameBoard: React.FC<GameBoardProps> = ({
   onCellClick,
   players,
   lastMove,
+  isMyTurn,
 }) => {
-  // Guard clause: if board is not yet defined or empty, render a loading message.
   if (!board || board.length === 0 || !board[0]) {
     return <div className="text-white">Loading board...</div>;
   }
 
   const getCriticalMass = (row: number, col: number): number => {
-    const isCorner = (row === 0 || row === board.length - 1) && 
-                     (col === 0 || col === board[0].length - 1);
-    const isEdge = row === 0 || col === 0 || 
-                   row === board.length - 1 || col === board[0].length - 1;
+    const isCorner =
+      (row === 0 || row === board.length - 1) &&
+      (col === 0 || col === board[0].length - 1);
+    const isEdge =
+      row === 0 ||
+      col === 0 ||
+      row === board.length - 1 ||
+      col === board[0].length - 1;
     return isCorner ? 2 : isEdge ? 3 : 4;
   };
 
-  // Compute the current player's color from the currentPlayer object.
   const currentPlayerColor = currentPlayer.color;
 
   return (
-    <div 
+    <div
       className="grid gap-1"
       style={{
         gridTemplateColumns: `repeat(${board[0].length}, minmax(0, 1fr))`,
@@ -43,11 +46,11 @@ const GameBoard: React.FC<GameBoardProps> = ({
     >
       {board.map((row, rowIndex) =>
         row.map((cell, colIndex) => {
-          // Look up the owner's color from the players array.
-          const ownerColor = cell.playerId 
-            ? (players.find((p: Player) => p.id === cell.playerId)?.color || '#FFFFFF')
+          const ownerColor = cell.playerId
+            ? players.find((p: Player) => p.id === cell.playerId)?.color ||
+              '#FFFFFF'
             : 'transparent';
-          
+
           return (
             <Cell
               key={`${rowIndex}-${colIndex}`}
@@ -58,7 +61,10 @@ const GameBoard: React.FC<GameBoardProps> = ({
               ownerColor={ownerColor}
               onCellClick={onCellClick}
               currentPlayerColor={currentPlayerColor}
-              isLastMove={lastMove?.row === rowIndex && lastMove?.col === colIndex}
+              isLastMove={
+                lastMove?.row === rowIndex && lastMove?.col === colIndex
+              }
+              isCurrentPlayerTurn={isMyTurn}
             />
           );
         })

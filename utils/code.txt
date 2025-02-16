@@ -28,25 +28,39 @@ export default App;
 
 @layer utilities {
   .custom-scrollbar {
+    scrollbar-width: none; /* Hide scrollbar by default for Firefox */
+    -ms-overflow-style: none; /* Hide scrollbar by default for IE/Edge */
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 0px; /* Hide scrollbar by default for Chrome/Safari/Opera */
+  }
+
+  /* Show scrollbar on hover and when scrolling */
+  .custom-scrollbar:hover,
+  .custom-scrollbar:active {
     scrollbar-width: thin;
     scrollbar-color: rgba(139, 92, 246, 0.5) rgba(17, 24, 39, 0.3);
   }
 
-  .custom-scrollbar::-webkit-scrollbar {
+  .custom-scrollbar:hover::-webkit-scrollbar,
+  .custom-scrollbar:active::-webkit-scrollbar {
     width: 6px;
   }
 
-  .custom-scrollbar::-webkit-scrollbar-track {
+  .custom-scrollbar:hover::-webkit-scrollbar-track,
+  .custom-scrollbar:active::-webkit-scrollbar-track {
     background: rgba(17, 24, 39, 0.3);
     border-radius: 3px;
   }
 
-  .custom-scrollbar::-webkit-scrollbar-thumb {
+  .custom-scrollbar:hover::-webkit-scrollbar-thumb,
+  .custom-scrollbar:active::-webkit-scrollbar-thumb {
     background-color: rgba(139, 92, 246, 0.5);
     border-radius: 3px;
   }
 
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  .custom-scrollbar:hover::-webkit-scrollbar-thumb:hover {
     background-color: rgba(139, 92, 246, 0.7);
   }
 }
@@ -84,6 +98,7 @@ const socket: Socket = io("http://localhost:3001", {
 
 
 ===== components\Cell.tsx =====
+// Cell.tsx
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Orb from './Orb';
@@ -96,9 +111,9 @@ interface CellProps {
     playerId: string | null;
   };
   criticalMass: number;
-  playerColors: Record<string, string>;
+  ownerColor: string;
   onCellClick: (row: number, col: number) => void;
-  currentPlayer: string;
+  currentPlayerColor: string;
   isLastMove: boolean;
 }
 
@@ -107,9 +122,9 @@ const Cell: React.FC<CellProps> = ({
   colIndex,
   cell,
   criticalMass,
-  playerColors,
+  ownerColor,
   onCellClick,
-  currentPlayer,
+  currentPlayerColor,
   isLastMove,
 }) => {
   const cellRef = useRef<HTMLDivElement>(null);
@@ -140,8 +155,8 @@ const Cell: React.FC<CellProps> = ({
       rotate: 0,
     },
     explode: {
-      scale: [1, 1.1, 0.9, 1], // Reduced scale for smaller cells
-      rotate: [0, 5, -5, 0], // Reduced rotation for smaller cells
+      scale: [1, 1.1, 0.9, 1],
+      rotate: [0, 5, -5, 0],
       transition: {
         duration: 0.4,
         ease: "easeInOut",
@@ -158,14 +173,14 @@ const Cell: React.FC<CellProps> = ({
                  backdrop-blur-sm hover:bg-gray-700/50 cursor-pointer overflow-hidden
                  transition-colors duration-200"
       style={{
-        borderColor: isLastMove ? playerColors[cell.playerId!] : 'transparent',
+        borderColor: isLastMove ? ownerColor : 'transparent',
       }}
       initial="initial"
       variants={cellVariants}
       animate={cell.orbs >= criticalMass ? "explode" : "initial"}
       whileHover={{ 
-        scale: 1.02, // Reduced hover scale
-        borderColor: playerColors[currentPlayer],
+        scale: 1.02,
+        borderColor: currentPlayerColor,
       }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onCellClick(rowIndex, colIndex)}
@@ -178,7 +193,7 @@ const Cell: React.FC<CellProps> = ({
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ 
-              scale: 1.2, // Reduced exit scale
+              scale: 1.2,
               opacity: 0,
               transition: { 
                 duration: 0.2,
@@ -188,7 +203,7 @@ const Cell: React.FC<CellProps> = ({
             className="w-full h-full flex items-center justify-center"
           >
             <Orb
-              color={playerColors[cell.playerId!]}
+              color={ownerColor}
               count={cell.orbs}
               isUnstable={isUnstable}
               cellSize={Math.min(cellSize.width, cellSize.height)}
@@ -279,7 +294,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto mb-4 space-y-2 pr-2 custom-scrollbar"
       >
-        {messages.map((msg) => {
+        {messages.map((msg, index) => {
           const senderName = getPlayerName(msg.playerId);
           // Remove duplicate sender name if the message text already begins with it
           let displayText = msg.text;
@@ -289,7 +304,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           }
           return (
             <motion.div 
-              key={msg.id} 
+              key={msg.id || index}  // Use msg.id if available; otherwise, use the index.
               className="text-sm"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -335,15 +350,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 export default ChatWindow;
 
 ===== components\GameBoard.tsx =====
+// GameBoard.tsx
 import React from 'react';
-import { Cell as CellType, Player} from '../types/game';
+import { Cell as CellType, Player } from '../types/game';
 import Cell from './Cell';
 
 interface GameBoardProps {
   board: CellType[][];
   onCellClick: (row: number, col: number) => void;
   currentPlayer: Player;
-  playerColors: Record<string, string>;
+  players: Player[];
   lastMove: { row: number; col: number } | null;
 }
 
@@ -351,16 +367,24 @@ const GameBoard: React.FC<GameBoardProps> = ({
   board,
   currentPlayer,
   onCellClick,
-  playerColors,
+  players,
   lastMove,
 }) => {
+  // Guard clause: if board is not yet defined or empty, render a loading message.
+  if (!board || board.length === 0 || !board[0]) {
+    return <div className="text-white">Loading board...</div>;
+  }
+
   const getCriticalMass = (row: number, col: number): number => {
     const isCorner = (row === 0 || row === board.length - 1) && 
-                    (col === 0 || col === board[0].length - 1);
+                     (col === 0 || col === board[0].length - 1);
     const isEdge = row === 0 || col === 0 || 
                    row === board.length - 1 || col === board[0].length - 1;
     return isCorner ? 2 : isEdge ? 3 : 4;
   };
+
+  // Compute the current player's color from the currentPlayer object.
+  const currentPlayerColor = currentPlayer.color;
 
   return (
     <div 
@@ -370,25 +394,33 @@ const GameBoard: React.FC<GameBoardProps> = ({
       }}
     >
       {board.map((row, rowIndex) =>
-        row.map((cell, colIndex) => (
-          <Cell
-            key={`${rowIndex}-${colIndex}`}
-            rowIndex={rowIndex}
-            colIndex={colIndex}
-            cell={cell}
-            criticalMass={getCriticalMass(rowIndex, colIndex)}
-            playerColors={playerColors}
-            onCellClick={onCellClick}
-            currentPlayer={currentPlayer.id}
-            isLastMove={lastMove?.row === rowIndex && lastMove?.col === colIndex}
-          />
-        ))
+        row.map((cell, colIndex) => {
+          // Look up the owner's color from the players array.
+          const ownerColor = cell.playerId 
+            ? (players.find((p: Player) => p.id === cell.playerId)?.color || '#FFFFFF')
+            : 'transparent';
+          
+          return (
+            <Cell
+              key={`${rowIndex}-${colIndex}`}
+              rowIndex={rowIndex}
+              colIndex={colIndex}
+              cell={cell}
+              criticalMass={getCriticalMass(rowIndex, colIndex)}
+              ownerColor={ownerColor}
+              onCellClick={onCellClick}
+              currentPlayerColor={currentPlayerColor}
+              isLastMove={lastMove?.row === rowIndex && lastMove?.col === colIndex}
+            />
+          );
+        })
       )}
     </div>
   );
 };
 
 export default GameBoard;
+
 
 ===== components\GameLogic.ts =====
 import { Cell, Player} from '../types/game';
@@ -722,7 +754,6 @@ export default GameOver;
 
 ===== components\GameRoom.tsx =====
 // GameRoom.tsx
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -749,16 +780,26 @@ const DEFAULT_SETTINGS: GameSettings = {
   boardSize: { rows: 9, cols: 6 }
 };
 
+const createEmptyBoard = (rows: number, cols: number): Cell[][] => {
+  const board: Cell[][] = [];
+  for (let i = 0; i < rows; i++) {
+    const row: Cell[] = [];
+    for (let j = 0; j < cols; j++) {
+      row.push({ orbs: 0, playerId: null });
+    }
+    board.push(row);
+  }
+  return board;
+};
+
 const GameRoom: React.FC = () => {
   const { roomId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Use sessionStorage so that each browser tab gets its own player name and admin status.
+  // Retrieve player info from location.state or sessionStorage.
   const storedPlayerName = sessionStorage.getItem("playerName");
   const storedIsAdmin = sessionStorage.getItem("isAdmin") === "true";
-
-  // Use location.state if available; otherwise, fall back to sessionStorage.
   const initialPlayerName = location.state?.playerName || storedPlayerName;
   const isAdmin = (location.state?.isAdmin !== undefined)
     ? location.state.isAdmin
@@ -778,7 +819,7 @@ const GameRoom: React.FC = () => {
     );
   }
 
-  // Create a default player object. (The id will be updated from the server.)
+  // Create a default player. (The id will be updated by the server later.)
   const defaultPlayer: Player = {
     id: '',
     name: initialPlayerName,
@@ -787,8 +828,11 @@ const GameRoom: React.FC = () => {
     isActive: true,
   };
 
-  // Local state for game data.
-  const [board, setBoard] = useState<Cell[][]>([]);
+  // Preinitialize board for admin; for non-admin, start with an empty array.
+  const boardSize = (location.state?.settings?.boardSize) || DEFAULT_SETTINGS.boardSize;
+  const initialBoard: Cell[][] = isAdmin ? createEmptyBoard(boardSize.rows, boardSize.cols) : [];
+
+  const [board, setBoard] = useState<Cell[][]>(initialBoard);
   const [players, setPlayers] = useState<Player[]>([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -797,39 +841,51 @@ const GameRoom: React.FC = () => {
   const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(null);
   const [isExploding, setIsExploding] = useState(false);
 
-  // Join the room and listen for player and chat updates.
+  // Send joinRoom event.
   useEffect(() => {
     socket.emit("joinRoom", { 
       roomId, 
       playerName: initialPlayerName, 
       isAdmin, 
-      gridSize: isAdmin ? (location.state?.settings?.boardSize || DEFAULT_SETTINGS.boardSize) : undefined 
+      gridSize: isAdmin ? boardSize : undefined 
     });
-    
-    const handlePlayerListUpdate = (updatedPlayers: Player[]) => {
-      const coloredPlayers = updatedPlayers.map((player, index) => ({
+    // (Other listeners like chatMessage can be set up here if needed.)
+  }, [roomId, initialPlayerName, isAdmin, boardSize]);
+
+  // Listen for gridSizeUpdate to set board for non-admins.
+  useEffect(() => {
+    socket.on("gridSizeUpdate", (gridSize: { rows: number; cols: number }) => {
+      const emptyBoard = createEmptyBoard(gridSize.rows, gridSize.cols);
+      setBoard(emptyBoard);
+    });
+    return () => {
+      socket.off("gridSizeUpdate");
+    };
+  }, []);
+
+  // Listen for updateGameState events.
+  useEffect(() => {
+    socket.on("updateGameState", (data: { board: any[][]; currentTurn: string; players: Player[]; winner: Player | null }) => {
+      // Convert the server board (with 'count' and 'owner') to the client board (with 'orbs' and 'playerId')
+      const convertedBoard = data.board.map(row =>
+        row.map(cell => ({
+          orbs: cell.count,
+          playerId: cell.owner
+        }))
+      );
+      if (convertedBoard && convertedBoard.length > 0 && convertedBoard[0].length > 0) {
+        setBoard(convertedBoard);
+      } else {
+        console.warn("Received invalid board data:", data.board);
+      }
+      // Also reassign colors to players (if necessary)
+      const coloredPlayers = data.players.map((player, index) => ({
         ...player,
-        color: Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length]
+        color: Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length],
       }));
       setPlayers(coloredPlayers);
-    };
-    const handleChatMessage = (msg: Message) => setMessages(prev => [...prev, msg]);
-
-    socket.on("playerListUpdate", handlePlayerListUpdate);
-    socket.on("chatMessage", handleChatMessage);
-
-    return () => {
-      socket.off("playerListUpdate", handlePlayerListUpdate);
-      socket.off("chatMessage", handleChatMessage);
-    };
-  }, [roomId, initialPlayerName, isAdmin]);
-
-  // Listen for game state updates from the server.
-  useEffect(() => {
-    socket.on("updateGameState", (data: { board: Cell[][]; currentTurn: string; players: Player[]; winner: Player | null }) => {
-      setBoard(data.board);
-      setPlayers(data.players);
-      const cp = data.players.find(p => p.id === data.currentTurn);
+      
+      const cp = coloredPlayers.find(p => p.id === data.currentTurn);
       if (cp) {
         setCurrentPlayer(cp);
       }
@@ -844,12 +900,34 @@ const GameRoom: React.FC = () => {
       socket.off("updateGameState");
     };
   }, []);
+  
+
+
+  useEffect(() => {
+    const handlePlayerListUpdate = (updatedPlayers: Player[]) => {
+      const coloredPlayers = updatedPlayers.map((player, index) => ({
+        ...player,
+        color: Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length],
+      }));
+      setPlayers(coloredPlayers);
+    };
+    socket.on("playerListUpdate", handlePlayerListUpdate);
+    return () => {
+      socket.off("playerListUpdate", handlePlayerListUpdate);
+    };
+  }, []);
 
   // For non-admins: listen for gameStart (if sent).
   useEffect(() => {
     if (!isAdmin) {
-      socket.on("gameStart", (data: { players: Player[]; board: Cell[][]; settings: GameSettings }) => {
-        setBoard(data.board);
+      socket.on("gameStart", (data: { players: Player[]; board: any[][]; settings: GameSettings }) => {
+        const convertedBoard = data.board.map(row =>
+          row.map(cell => ({
+            orbs: cell.count,
+            playerId: cell.owner
+          }))
+        );
+        setBoard(convertedBoard);
         setPlayers(data.players);
         setGameStarted(true);
       });
@@ -858,6 +936,7 @@ const GameRoom: React.FC = () => {
       socket.off("gameStart");
     };
   }, [isAdmin]);
+  
 
   // When a cell is clicked, emit a "makeMove" event.
   const handleCellClick = (row: number, col: number) => {
@@ -879,6 +958,17 @@ const GameRoom: React.FC = () => {
     setWinner(null);
   };
 
+  useEffect(() => {
+    const handleChatMessage = (msg: Message) => {
+      setMessages(prev => [...prev, msg]);
+    };
+    socket.on("chatMessage", handleChatMessage);
+    return () => {
+      socket.off("chatMessage", handleChatMessage);
+    };
+  }, []);
+  
+
   return (
     <div className="min-h-screen bg-gray-900 relative">
       <motion.div className="p-3 lg:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -894,13 +984,13 @@ const GameRoom: React.FC = () => {
               isAdmin={isAdmin}
             />
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">
-              <GameBoard
-                board={board}
-                currentPlayer={currentPlayer}
-                onCellClick={handleCellClick}
-                playerColors={PLAYER_COLORS}
-                lastMove={lastMove}
-              />
+            <GameBoard
+              board={board}
+              currentPlayer={currentPlayer}
+              onCellClick={handleCellClick}
+              players={players}
+              lastMove={lastMove}
+            />
               {winner && (
                 <GameOver
                   winner={{ name: winner.name, color: winner.color }}
