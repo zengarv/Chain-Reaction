@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users } from 'lucide-react';
+import { Users, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Player } from '../types/game';
 
@@ -72,18 +72,22 @@ const PlayersList: React.FC<PlayersListProps> = ({
               }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            >
-              <div
+            >              <div
                 className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: player.color }}
+                style={{ backgroundColor: player.isSpectator ? '#6B7280' : player.color }}
               />
               
-              <span className="text-gray-300">{player.name}</span>
+              <span className={`${player.isSpectator ? 'text-gray-400' : 'text-gray-300'}`}>
+                {player.name}
+              </span>
               
-              {!player.isActive && gameStarted && (
+              {player.isSpectator && (
+                <Eye className="w-4 h-4 text-gray-400 ml-auto" />
+              )}
+              {!player.isSpectator && !player.isActive && gameStarted && (
                 <span className="text-xs text-red-400 ml-auto">Eliminated</span>
               )}
-              {player.id === currentPlayer && gameStarted && (
+              {!player.isSpectator && player.id === currentPlayer && gameStarted && (
                 <span className="text-xs text-green-400 ml-auto">Current Turn</span>
               )}
             </motion.div>

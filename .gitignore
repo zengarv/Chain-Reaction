@@ -25,3 +25,5 @@ dist-ssr
 
 # Util debug files
 .utils/code.txt
+
+server.js

@@ -114,14 +114,13 @@ const GameRoom: React.FC = () => {
       socket.off('gridSizeUpdate');
     };
   }, []);
-
   // Listen for updateGameState to update board, players, and current turn
   useEffect(() => {
     socket.on(
       'updateGameState',
       (data: {
         board: any[][];
-        currentTurn: string;
+        currentTurn: string | null;
         players: Player[];
         winner: Player | null;
         lastMove?: { row: number; col: number };
@@ -142,9 +141,12 @@ const GameRoom: React.FC = () => {
         }));
         setPlayers(coloredPlayers);
   
-        const cp = coloredPlayers.find((p) => p.id === data.currentTurn);
-        if (cp) {
-          setCurrentPlayer(cp);
+        // Only update current player if the game is ongoing (currentTurn is not null)
+        if (data.currentTurn) {
+          const cp = coloredPlayers.find((p) => p.id === data.currentTurn);
+          if (cp) {
+            setCurrentPlayer(cp);
+          }
         }        if (data.winner) {
           // Find the winner in the colored players array to get the correct color
           const winnerWithColor = coloredPlayers.find((p) => p.id === data.winner!.id);
@@ -216,9 +218,8 @@ const GameRoom: React.FC = () => {
       socket.off('errorMessage', handleErrorMessage);
     };
   }, []);
-
   const handleCellClick = (row: number, col: number) => {
-    if (!gameStarted || isExploding) return;
+    if (!gameStarted || isExploding || winner) return; // Also check if there's a winner
     setLastMove({ row, col });
     socket.emit('makeMove', { roomId, row, col });
   };
@@ -253,16 +254,13 @@ const GameRoom: React.FC = () => {
               onStartGame={handleStartGame}
               gameStarted={gameStarted}
               isAdmin={isAdmin}
-            />
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">
-              <GameBoard
+            />            <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">              <GameBoard
                 board={board}
                 currentPlayer={currentPlayer}
                 onCellClick={handleCellClick}
                 players={players}
-                lastMove={lastMove}
-                isMyTurn={myId === currentPlayer.id}
-              />              {winner && (
+                lastMove={lastMove}                isMyTurn={myId === currentPlayer.id && !players.find(p => p.id === myId)?.isSpectator && !winner}              />
+              {winner && (
                 <GameOver
                   winner={{ name: winner.name, color: winner.color }}
                   onPlayAgain={handlePlayAgain}
