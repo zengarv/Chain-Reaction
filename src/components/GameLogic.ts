@@ -42,7 +42,6 @@ export class GameLogic {
     this.board = newBoard;
     return this.board[row][col].orbs >= criticalMass;
   }
-
   public handleExplosions(
     onExplode: (board: Cell[][]) => void,
     delay: number
@@ -55,10 +54,9 @@ export class GameLogic {
       
       while (explosionOccurred && iterationCount < this.maxExplosionIterations) {
         explosionOccurred = false;
-        const newBoard = this.board.map(row => row.map(cell => ({...cell})));
         
         // Create a string representation of the current board state
-        const currentBoardState = this.getBoardStateString(newBoard);
+        const currentBoardState = this.getBoardStateString(this.board);
         
         // Check if we've seen this board state before
         if (previousBoardStates.has(currentBoardState)) {
@@ -70,19 +68,22 @@ export class GameLogic {
         
         previousBoardStates.add(currentBoardState);
 
-        for (let row = 0; row < this.rows; row++) {
-          for (let col = 0; col < this.cols; col++) {
-            const cell = newBoard[row][col];
+        // Find the first cell that needs to explode
+        let foundExplosion = false;
+        for (let row = 0; row < this.rows && !foundExplosion; row++) {
+          for (let col = 0; col < this.cols && !foundExplosion; col++) {
+            const cell = this.board[row][col];
             if (cell.orbs >= this.getCriticalMass(row, col)) {
-              this.explodeCell(newBoard, row, col);
+              // Explode this cell immediately on the current board
+              this.explodeCell(this.board, row, col);
               explosionOccurred = true;
               hasExploded = true;
+              foundExplosion = true; // Break out of both loops
             }
           }
         }
 
         if (explosionOccurred) {
-          this.board = newBoard;
           onExplode(this.board);
           await new Promise(resolve => setTimeout(resolve, delay));
           iterationCount++;
