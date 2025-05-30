@@ -145,11 +145,21 @@ const GameRoom: React.FC = () => {
         const cp = coloredPlayers.find((p) => p.id === data.currentTurn);
         if (cp) {
           setCurrentPlayer(cp);
-        }
-        if (data.winner) {
-          setWinner(data.winner);
+        }        if (data.winner) {
+          // Find the winner in the colored players array to get the correct color
+          const winnerWithColor = coloredPlayers.find((p) => p.id === data.winner!.id);
+          if (winnerWithColor) {
+            setWinner(winnerWithColor);
+          } else {
+            // Fallback: assign default color if not found
+            setWinner({
+              ...data.winner,
+              color: PLAYER_COLORS.player1 // fallback color
+            });
+          }
           setGameStarted(false);
         } else {
+          setWinner(null); // Clear the winner when game restarts
           setGameStarted(true);
         }
   
@@ -178,9 +188,7 @@ const GameRoom: React.FC = () => {
     return () => {
       socket.off('playerListUpdate', handlePlayerListUpdate);
     };
-  }, []);
-
-  // Listen for chat messages
+  }, []);  // Listen for chat messages
   useEffect(() => {
     const handleChatMessage = (msg: Message) => {
       setMessages((prev) => [...prev, msg]);
@@ -188,6 +196,24 @@ const GameRoom: React.FC = () => {
     socket.on('chatMessage', handleChatMessage);
     return () => {
       socket.off('chatMessage', handleChatMessage);
+    };
+  }, []);
+
+  // Listen for error messages from server
+  useEffect(() => {
+    const handleErrorMessage = (error: string) => {
+      console.error('Server error:', error);
+      // You could also show this error in the UI if needed
+      setMessages((prev) => [...prev, {
+        id: Date.now().toString(),
+        playerId: 'Server',
+        text: `Error: ${error}`,
+        timestamp: new Date()
+      }]);
+    };
+    socket.on('errorMessage', handleErrorMessage);
+    return () => {
+      socket.off('errorMessage', handleErrorMessage);
     };
   }, []);
 
@@ -202,10 +228,10 @@ const GameRoom: React.FC = () => {
       socket.emit('gameStart', { roomId });
     }
   };
-
   const handlePlayAgain = () => {
     socket.emit('playAgain', { roomId });
     setWinner(null);
+    setLastMove(null);  // Reset lastMove on client side too
   };
 
   return (
@@ -236,12 +262,11 @@ const GameRoom: React.FC = () => {
                 players={players}
                 lastMove={lastMove}
                 isMyTurn={myId === currentPlayer.id}
-              />
-              {winner && (
+              />              {winner && (
                 <GameOver
                   winner={{ name: winner.name, color: winner.color }}
                   onPlayAgain={handlePlayAgain}
-                  onShufflePlayers={() => {}}
+                  isAdmin={isAdmin}
                 />
               )}
             </div>

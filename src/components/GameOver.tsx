@@ -8,10 +8,10 @@ interface GameOverProps {
     color: string;
   };
   onPlayAgain: () => void;
-  onShufflePlayers: () => void;
+  isAdmin: boolean;
 }
 
-const GameOver: React.FC<GameOverProps> = ({ winner, onPlayAgain, onShufflePlayers }) => {
+const GameOver: React.FC<GameOverProps> = ({ winner, onPlayAgain, isAdmin }) => {
   return (
     <div className="absolute inset-0 flex items-center justify-center p-4 z-50">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
@@ -39,17 +39,23 @@ const GameOver: React.FC<GameOverProps> = ({ winner, onPlayAgain, onShufflePlaye
         <p className="text-gray-300 mb-6">
           {winner.name} has conquered the board!
         </p>
-        
-        <div className="space-y-3">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="bg-purple-600 text-white py-3 px-6 rounded-lg font-medium 
-                     hover:bg-purple-700 transition-colors w-full"
-            onClick={onPlayAgain}
-          >
-            Play Again
-          </motion.button>
+          <div className="space-y-3">
+          {isAdmin && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="bg-purple-600 text-white py-3 px-6 rounded-lg font-medium 
+                       hover:bg-purple-700 transition-colors w-full"
+              onClick={onPlayAgain}
+            >
+              Play Again
+            </motion.button>
+          )}
+          {!isAdmin && (
+            <p className="text-gray-400 text-sm">
+              Waiting for admin to restart the game...
+            </p>
+          )}
         </div>
       </motion.div>
     </div>
