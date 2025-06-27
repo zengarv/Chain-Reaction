@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gamepad2, Grid, User } from 'lucide-react';
+import { Gamepad2, Grid, User, Clock } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { motion } from 'framer-motion';
 
@@ -8,6 +8,7 @@ const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [boardSize, setBoardSize] = useState({ rows: 9, cols: 6 });
   const [username, setUsername] = useState('');
+  const [timerDuration, setTimerDuration] = useState(20);
 
   const createRoom = () => {
     if (!username.trim()) return;
@@ -18,7 +19,10 @@ const LandingPage: React.FC = () => {
     navigate(`/room/${roomId}`, {
       state: { 
         isAdmin: true, 
-        settings: { boardSize },
+        settings: { 
+          boardSize,
+          timer: { duration: timerDuration }
+        },
         playerName: username
       }
     });
@@ -125,6 +129,24 @@ const LandingPage: React.FC = () => {
                 <span className="text-xs text-gray-400 mt-1">Columns</span>
               </motion.div>
             </div>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-purple-500" />
+              Turn Timer (seconds)
+            </label>
+            <motion.input
+              type="number"
+              value={timerDuration}
+              onChange={(e) => setTimerDuration(parseInt(e.target.value) || 20)}
+              className="w-full px-4 py-2 bg-gray-700 rounded-lg"
+              placeholder="20"
+              min="10"
+              max="60"
+              whileHover={{ scale: 1.02 }}
+            />
+            <span className="text-xs text-gray-400 mt-1">Time limit for each player's turn</span>
           </motion.div>
 
           <motion.button

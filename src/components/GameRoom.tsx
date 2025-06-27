@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import GameBoard from './GameBoard';
 import PlayersList from './PlayersList';
 import ChatWindow from './ChatWindow';
+import Timer from './Timer';
 import { Cell, GameSettings, Message, Player } from '../types/game';
 import { RoomHeader } from './RoomHeader';
 import GameOver from './GameOver';
@@ -22,6 +23,7 @@ const PLAYER_COLORS: Record<string, string> = {
 
 const DEFAULT_SETTINGS: GameSettings = {
   boardSize: { rows: 9, cols: 6 },
+  timer: { duration: 20 },
 };
 
 const createEmptyBoard = (rows: number, cols: number): Cell[][] => {
@@ -74,6 +76,9 @@ const GameRoom: React.FC = () => {
   const boardSize =
     (location.state?.settings?.boardSize as GameSettings['boardSize']) ||
     DEFAULT_SETTINGS.boardSize;
+  const timerSettings =
+    (location.state?.settings?.timer as GameSettings['timer']) ||
+    DEFAULT_SETTINGS.timer;
   const initialBoard: Cell[][] = isAdmin
     ? createEmptyBoard(boardSize.rows, boardSize.cols)
     : [];
@@ -89,20 +94,24 @@ const GameRoom: React.FC = () => {
   );
   const [isExploding, setIsExploding] = useState(false);
   const [myId, setMyId] = useState<string>('');
+  const [timer, setTimer] = useState<{ timeLeft: number; isActive: boolean }>({ 
+    timeLeft: 0, 
+    isActive: false 
+  });
 
   // Ensure myId is always a string
   useEffect(() => {
     setMyId(socket.id || '');
   }, []);
-
   useEffect(() => {
     socket.emit('joinRoom', {
       roomId,
       playerName: initialPlayerName,
       isAdmin,
       gridSize: isAdmin ? boardSize : undefined,
+      timerSettings: isAdmin ? timerSettings : undefined,
     });
-  }, [roomId, initialPlayerName, isAdmin, boardSize]);
+  }, [roomId, initialPlayerName, isAdmin, boardSize, timerSettings]);
 
   // Listen for gridSizeUpdate to set the board for non-admins
   useEffect(() => {
@@ -218,6 +227,18 @@ const GameRoom: React.FC = () => {
       socket.off('errorMessage', handleErrorMessage);
     };
   }, []);
+
+  // Listen for timer updates
+  useEffect(() => {
+    const handleTimerUpdate = (timerData: { timeLeft: number; isActive: boolean }) => {
+      setTimer(timerData);
+    };
+    socket.on('timerUpdate', handleTimerUpdate);
+    return () => {
+      socket.off('timerUpdate', handleTimerUpdate);
+    };
+  }, []);
+
   const handleCellClick = (row: number, col: number) => {
     if (!gameStarted || isExploding || winner) return; // Also check if there's a winner
     setLastMove({ row, col });
@@ -268,13 +289,19 @@ const GameRoom: React.FC = () => {
                 />
               )}
             </div>
-          </div>
-          <div className="space-y-3 lg:space-y-4 lg:min-w-[320px]">
+          </div>          <div className="space-y-3 lg:space-y-4 lg:min-w-[320px]">
             <PlayersList
               players={players}
               currentPlayer={currentPlayer.id}
               gameStarted={gameStarted}
-            />
+            />            {gameStarted && timer.isActive && (
+              <Timer
+                timeLeft={timer.timeLeft}
+                isActive={timer.isActive}
+                currentPlayerName={currentPlayer.name}
+                totalDuration={timerSettings.duration}
+              />
+            )}
             <ChatWindow
               messages={messages}
               players={players}

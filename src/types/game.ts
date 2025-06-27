@@ -3,6 +3,9 @@ export interface GameSettings {
     rows: number;
     cols: number;
   };
+  timer: {
+    duration: number; // Timer duration in seconds (default 20)
+  };
 }
 
 export interface Player {
