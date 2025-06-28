@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Trophy } from 'lucide-react';
+import { Trophy, Shuffle } from 'lucide-react';
 
 interface GameOverProps {
   winner: {
@@ -9,9 +9,10 @@ interface GameOverProps {
   };
   onPlayAgain: () => void;
   isAdmin: boolean;
+  onShufflePlayers: () => void;
 }
 
-const GameOver: React.FC<GameOverProps> = ({ winner, onPlayAgain, isAdmin }) => {
+const GameOver: React.FC<GameOverProps> = ({ winner, onPlayAgain, isAdmin, onShufflePlayers }) => {
   return (
     <div className="absolute inset-0 flex items-center justify-center p-4 z-50">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
@@ -38,18 +39,29 @@ const GameOver: React.FC<GameOverProps> = ({ winner, onPlayAgain, isAdmin }) => 
         
         <p className="text-gray-300 mb-6">
           {winner.name} has conquered the board!
-        </p>
-          <div className="space-y-3">
+        </p>          <div className="space-y-3">
           {isAdmin && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="bg-purple-600 text-white py-3 px-6 rounded-lg font-medium 
-                       hover:bg-purple-700 transition-colors w-full"
-              onClick={onPlayAgain}
-            >
-              Play Again
-            </motion.button>
+            <>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="bg-purple-600 text-white py-3 px-6 rounded-lg font-medium 
+                         hover:bg-purple-700 transition-colors w-full"
+                onClick={onPlayAgain}
+              >
+                Play Again
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex items-center justify-center gap-2 bg-gray-600 text-white py-2 px-4 rounded-lg font-medium 
+                         hover:bg-gray-700 transition-colors w-full"
+                onClick={onShufflePlayers}
+              >
+                <Shuffle className="w-4 h-4" />
+                Shuffle Players
+              </motion.button>
+            </>
           )}
           {!isAdmin && (
             <p className="text-gray-400 text-sm">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import GameBoard from './GameBoard';
@@ -93,11 +93,13 @@ const GameRoom: React.FC = () => {
     null
   );
   const [isExploding, setIsExploding] = useState(false);
-  const [myId, setMyId] = useState<string>('');
-  const [timer, setTimer] = useState<{ timeLeft: number; isActive: boolean }>({ 
+  const [myId, setMyId] = useState<string>('');  const [timer, setTimer] = useState<{ timeLeft: number; isActive: boolean }>({ 
     timeLeft: 0, 
     isActive: false 
   });
+
+  // Ref to store current player colors to avoid stale closure issues
+  const playerColorsRef = useRef<Map<string, string>>(new Map());
 
   // Ensure myId is always a string
   useEffect(() => {
@@ -139,26 +141,33 @@ const GameRoom: React.FC = () => {
             orbs: cell.count,
             playerId: cell.owner,
           }))
-        );
-        setBoard(convertedBoard);
+        );        setBoard(convertedBoard);
   
+        // Create a map of existing player colors using the ref
+        const existingColors = new Map(playerColorsRef.current);
+
+        // Assign colors to players, preserving existing ones
         const coloredPlayers = data.players.map((player, index) => ({
           ...player,
-          color: Object.values(PLAYER_COLORS)[
-            index % Object.values(PLAYER_COLORS).length
-          ],
+          color: existingColors.get(player.id) || 
+                 Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length],
         }));
+        
         setPlayers(coloredPlayers);
-  
-        // Only update current player if the game is ongoing (currentTurn is not null)
+
+        // Update the ref with the new color mappings
+        playerColorsRef.current.clear();
+        coloredPlayers.forEach(player => {
+          playerColorsRef.current.set(player.id, player.color);
+        });// Only update current player if the game is ongoing (currentTurn is not null)
         if (data.currentTurn) {
-          const cp = coloredPlayers.find((p) => p.id === data.currentTurn);
+          const cp = coloredPlayers.find((p: Player) => p.id === data.currentTurn);
           if (cp) {
             setCurrentPlayer(cp);
           }
         }        if (data.winner) {
           // Find the winner in the colored players array to get the correct color
-          const winnerWithColor = coloredPlayers.find((p) => p.id === data.winner!.id);
+          const winnerWithColor = coloredPlayers.find((p: Player) => p.id === data.winner!.id);
           if (winnerWithColor) {
             setWinner(winnerWithColor);
           } else {
@@ -182,24 +191,40 @@ const GameRoom: React.FC = () => {
       socket.off('updateGameState');
     };
   }, []);
-  
-
-  // Listen for player list updates so the player count reflects new joins
+    // Listen for player list updates so the player count reflects new joins
   useEffect(() => {
     const handlePlayerListUpdate = (updatedPlayers: Player[]) => {
+      // Create a map of existing player colors using the ref
+      const existingColors = new Map(playerColorsRef.current);
+
+      // Assign colors to players, preserving existing ones
       const coloredPlayers = updatedPlayers.map((player, index) => ({
         ...player,
-        color: Object.values(PLAYER_COLORS)[
-          index % Object.values(PLAYER_COLORS).length
-        ],
+        color: existingColors.get(player.id) || 
+               Object.values(PLAYER_COLORS)[index % Object.values(PLAYER_COLORS).length],
       }));
+      
       setPlayers(coloredPlayers);
+
+      // Update the ref with the new color mappings
+      playerColorsRef.current.clear();
+      coloredPlayers.forEach(player => {
+        playerColorsRef.current.set(player.id, player.color);
+      });
     };
     socket.on('playerListUpdate', handlePlayerListUpdate);
     return () => {
       socket.off('playerListUpdate', handlePlayerListUpdate);
     };
-  }, []);  // Listen for chat messages
+  }, []);
+
+  // Keep the playerColorsRef in sync with the players state
+  useEffect(() => {
+    playerColorsRef.current.clear();
+    players.forEach(player => {
+      playerColorsRef.current.set(player.id, player.color);
+    });
+  }, [players]);// Listen for chat messages
   useEffect(() => {
     const handleChatMessage = (msg: Message) => {
       setMessages((prev) => [...prev, msg]);
@@ -249,11 +274,14 @@ const GameRoom: React.FC = () => {
     if (players.length >= 2) {
       socket.emit('gameStart', { roomId });
     }
-  };
-  const handlePlayAgain = () => {
+  };  const handlePlayAgain = () => {
     socket.emit('playAgain', { roomId });
     setWinner(null);
     setLastMove(null);  // Reset lastMove on client side too
+  };
+
+  const handleShufflePlayers = () => {
+    socket.emit('shufflePlayers', { roomId });
   };
 
   return (
@@ -280,21 +308,22 @@ const GameRoom: React.FC = () => {
                 currentPlayer={currentPlayer}
                 onCellClick={handleCellClick}
                 players={players}
-                lastMove={lastMove}                isMyTurn={myId === currentPlayer.id && !players.find(p => p.id === myId)?.isSpectator && !winner}              />
-              {winner && (
+                lastMove={lastMove}                isMyTurn={myId === currentPlayer.id && !players.find(p => p.id === myId)?.isSpectator && !winner}              />              {winner && (
                 <GameOver
                   winner={{ name: winner.name, color: winner.color }}
                   onPlayAgain={handlePlayAgain}
                   isAdmin={isAdmin}
+                  onShufflePlayers={handleShufflePlayers}
                 />
               )}
             </div>
-          </div>          <div className="space-y-3 lg:space-y-4 lg:min-w-[320px]">
-            <PlayersList
+          </div>          <div className="space-y-3 lg:space-y-4 lg:min-w-[320px]">            <PlayersList
               players={players}
               currentPlayer={currentPlayer.id}
               gameStarted={gameStarted}
-            />            {gameStarted && timer.isActive && (
+              isAdmin={isAdmin}
+              onShufflePlayers={handleShufflePlayers}
+            />{gameStarted && timer.isActive && (
               <Timer
                 timeLeft={timer.timeLeft}
                 isActive={timer.isActive}
