@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    overflow-x: hidden; /* Prevent horizontal scroll */
+    height: 100vh; /* Ensure body takes full viewport height */
+  }
+
+  #root {
+    overflow-x: hidden; /* Prevent horizontal scroll */
+    height: 100vh; /* Ensure root takes full viewport height */
+  }
+}
+
 @layer utilities {
   .custom-scrollbar {
     scrollbar-width: none; /* Hide scrollbar by default for Firefox */
@@ -38,5 +50,63 @@
 
   .custom-scrollbar:hover::-webkit-scrollbar-thumb:hover {
     background-color: rgba(139, 92, 246, 0.7);
+  }
+
+  /* Responsive game board utilities */
+  .game-board-container {
+    contain: layout style size;
+    will-change: transform;
+    transition: all 0.3s ease-in-out;
+  }
+
+  .game-board-grid {
+    contain: layout style;
+    transition: all 0.3s ease-in-out;
+  }
+
+  /* Orientation toggle button animations */
+  .orientation-toggle {
+    transition: all 0.2s ease-in-out;
+  }
+
+  .orientation-toggle:hover {
+    transform: scale(1.1);
+  }
+
+  /* Optimize for different orientations and screen sizes */
+  @media (max-width: 1023px) {
+    /* Mobile and tablet: remove max-height restrictions for better fitting */
+    .game-board-container {
+      max-width: 100%;
+    }
+  }
+
+  @media (orientation: portrait) and (max-width: 768px) {
+    /* Portrait mobile: remove height restrictions to allow full board visibility */
+    .game-board-container {
+      max-width: 95vw;
+    }
+    
+    /* Ensure smooth single scroll on mobile */
+    body, #root {
+      height: auto;
+      min-height: 100vh;
+    }
+  }
+
+  @media (orientation: landscape) and (min-width: 1024px) {
+    /* Desktop landscape: optimize for wide screens */
+    .game-board-container {
+      max-height: 85vh;
+      max-width: 100%;
+    }
+  }
+
+  /* Ultra-wide screens */
+  @media (min-width: 1400px) {
+    .game-board-container {
+      max-height: 80vh;
+      max-width: 100%;
+    }
   }
 }

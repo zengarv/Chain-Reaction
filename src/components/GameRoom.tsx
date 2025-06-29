@@ -88,15 +88,14 @@ const GameRoom: React.FC = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<Player>(defaultPlayer);
-  const [winner, setWinner] = useState<Player | null>(null);
-  const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(
+  const [winner, setWinner] = useState<Player | null>(null);  const [lastMove, setLastMove] = useState<{ row: number; col: number } | null>(
     null
   );
-  const [isExploding, setIsExploding] = useState(false);
   const [myId, setMyId] = useState<string>('');  const [timer, setTimer] = useState<{ timeLeft: number; isActive: boolean }>({ 
     timeLeft: 0, 
     isActive: false 
   });
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape' | 'auto'>('auto');
 
   // Ref to store current player colors to avoid stale closure issues
   const playerColorsRef = useRef<Map<string, string>>(new Map());
@@ -263,9 +262,8 @@ const GameRoom: React.FC = () => {
       socket.off('timerUpdate', handleTimerUpdate);
     };
   }, []);
-
   const handleCellClick = (row: number, col: number) => {
-    if (!gameStarted || isExploding || winner) return; // Also check if there's a winner
+    if (!gameStarted || winner) return; // Also check if there's a winner
     setLastMove({ row, col });
     socket.emit('makeMove', { roomId, row, col });
   };
@@ -279,36 +277,50 @@ const GameRoom: React.FC = () => {
     setWinner(null);
     setLastMove(null);  // Reset lastMove on client side too
   };
-
   const handleShufflePlayers = () => {
     socket.emit('shufflePlayers', { roomId });
   };
 
-  return (
-    <div className="min-h-screen bg-gray-900 relative">
+  const handleOrientationToggle = () => {
+    setOrientation(prev => {
+      if (prev === 'auto') return 'portrait';
+      if (prev === 'portrait') return 'landscape';
+      return 'auto';
+    });
+  };  return (
+    <div className="min-h-screen bg-gray-900 relative overflow-x-hidden">
       <motion.div
-        className="p-3 lg:p-4"
+        className="min-h-screen flex flex-col p-2 lg:p-3 overflow-x-hidden"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3 lg:gap-4">
-          <div className="lg:col-span-3 relative">
-            <RoomHeader
-              roomId={roomId || ''}
-              playerCount={players.length}
-              currentPlayer={currentPlayer}
-              showStartButton={
-                !gameStarted && currentPlayer.isAdmin && players.length >= 2
-              }
-              onStartGame={handleStartGame}
-              gameStarted={gameStarted}
-              isAdmin={isAdmin}
-            />            <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 lg:p-4 relative">              <GameBoard
+        {/* Header always at top */}
+        <RoomHeader
+          roomId={roomId || ''}
+          playerCount={players.length}
+          currentPlayer={currentPlayer}
+          showStartButton={
+            !gameStarted && currentPlayer.isAdmin && players.length >= 2
+          }
+          onStartGame={handleStartGame}
+          gameStarted={gameStarted}
+          isAdmin={isAdmin}
+          orientation={orientation}
+          onOrientationToggle={handleOrientationToggle}
+        />        {/* Responsive layout: side-by-side on large screens, single scroll on mobile/portrait */}
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-4 xl:grid-cols-5 gap-2 lg:gap-3 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-y-hidden">          {/* GameBoard section - fixed height on mobile for single scroll */}
+          <div className="lg:col-span-3 xl:col-span-4 flex flex-col min-h-0 flex-shrink-0 lg:h-auto">
+            <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-0 lg:p-3 relative h-[90vh] lg:flex-1 lg:min-h-0 flex items-center justify-center overflow-hidden">
+              <GameBoard
                 board={board}
                 currentPlayer={currentPlayer}
                 onCellClick={handleCellClick}
                 players={players}
-                lastMove={lastMove}                isMyTurn={myId === currentPlayer.id && !players.find(p => p.id === myId)?.isSpectator && !winner}              />              {winner && (
+                lastMove={lastMove}
+                isMyTurn={myId === currentPlayer.id && !players.find(p => p.id === myId)?.isSpectator && !winner}
+                forceOrientation={orientation}
+              />
+              {winner && (
                 <GameOver
                   winner={{ name: winner.name, color: winner.color }}
                   onPlayAgain={handlePlayAgain}
@@ -317,29 +329,33 @@ const GameRoom: React.FC = () => {
                 />
               )}
             </div>
-          </div>          <div className="space-y-3 lg:space-y-4 lg:min-w-[320px]">            <PlayersList
+          </div>          {/* Players and Chat section - no inner scroll on mobile, flows with page scroll */}
+          <div className="flex flex-col space-y-2 lg:space-y-3 min-w-0 lg:min-w-[280px] flex-shrink-0 lg:h-auto lg:overflow-y-auto lg:overflow-x-hidden">
+            <PlayersList
               players={players}
               currentPlayer={currentPlayer.id}
               gameStarted={gameStarted}
               isAdmin={isAdmin}
               onShufflePlayers={handleShufflePlayers}
-            />{gameStarted && timer.isActive && (
+            />
+            {gameStarted && timer.isActive && (
               <Timer
                 timeLeft={timer.timeLeft}
                 isActive={timer.isActive}
                 currentPlayerName={currentPlayer.name}
                 totalDuration={timerSettings.duration}
               />
-            )}
-            <ChatWindow
-              messages={messages}
-              players={players}
-              roomId={roomId || ''}
-              currentPlayerName={initialPlayerName}
-            />
+            )}            <div className="lg:flex-1 lg:min-h-[200px] lg:overflow-hidden">
+              <ChatWindow
+                messages={messages}
+                players={players}
+                roomId={roomId || ''}
+                currentPlayerName={initialPlayerName}
+              />
+            </div>
             {!gameStarted && currentPlayer.isAdmin && (
               <motion.button
-                className="hidden lg:block w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
+                className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium 
                            hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

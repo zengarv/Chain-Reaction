@@ -49,10 +49,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     const player = players.find(p => p.id === playerId);
     return player ? player.color : '#FFFFFF';
   };
-
-  return (
-    <motion.div 
-      className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 h-[300px] flex flex-col"
+  return (    <motion.div 
+      className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 flex flex-col lg:h-full lg:min-h-[200px]"
       whileHover={{ scale: 1.01 }}
       transition={{ type: "spring", stiffness: 300 }}
     >
@@ -68,10 +66,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         </motion.div>
         <h2 className="text-lg font-semibold text-white">Chat</h2>
       </motion.div>
-      
-      <div 
+        <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto mb-4 space-y-2 pr-2 custom-scrollbar"
+        className="flex-1 lg:overflow-y-auto mb-4 space-y-2 pr-2 lg:custom-scrollbar"
       >
         {messages.map((msg, index) => {
           const senderName = getPlayerName(msg.playerId);

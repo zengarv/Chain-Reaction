@@ -63,15 +63,14 @@ const Cell: React.FC<CellProps> = ({
       },
     },
   };
-
   return (
     <motion.div
       ref={cellRef}
       key={`${rowIndex}-${colIndex}`}
-      className="aspect-square border-2 border-transparent rounded-lg bg-gray-800/50 
+      className="aspect-square border-2 rounded-lg bg-gray-800/50 
                  backdrop-blur-sm cursor-pointer overflow-hidden transition-colors duration-200"
       style={{
-        borderColor: isLastMove ? ownerColor : 'transparent',
+        borderColor: isLastMove ? ownerColor : 'rgba(0, 0, 0, 0)', // Use rgba(0,0,0,0) instead of transparent
       }}
       initial="initial"
       variants={cellVariants}
